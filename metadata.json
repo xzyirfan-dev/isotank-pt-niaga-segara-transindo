@@ -1,0 +1,6 @@
+{
+  "name": "IsoTrack - PT Niaga Segara Trasindo",
+  "description": "Sistem Manajemen Aset Isotank & Operasional Karyawan Terpadu dengan Analytics Real-time & Gemini AI Insights",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

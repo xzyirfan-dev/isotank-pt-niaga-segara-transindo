@@ -1,0 +1,98 @@
+import { LeadStatus, StageInfo } from '../types';
+
+export const STAGE_LIST: StageInfo[] = [
+  {
+    step: 1,
+    id: 'lead_created',
+    name: '1. Lead Created & Transporter',
+    shortName: '1 Baru & Truk',
+    actor: 'Karyawan Pembuat',
+    description: 'Inisiasi Lead baru, pencarian & penunjukan Mitra Perusahaan Transporter, penginputan nama supir, no. plat truk, dan lampiran dokumen kemitraan absah.',
+    badgeBg: 'bg-blue-500/10 border-blue-500/30',
+    badgeText: 'text-blue-400',
+  },
+  {
+    step: 2,
+    id: 'lead_approval',
+    name: '2. Lead & Transport Approval',
+    shortName: '2 Approval Truk',
+    actor: 'Manager Operasional',
+    description: 'Pemeriksaan kelayakan rute, verifikasi Mitra Transporter, data Supir, Plat Truk, & dokumen absah oleh Manager.',
+    badgeBg: 'bg-amber-500/10 border-amber-500/30',
+    badgeText: 'text-amber-400',
+  },
+  {
+    step: 3,
+    id: 'in_progress',
+    name: '3. In Progress (Mobilisasi)',
+    shortName: '3 Mobilisasi',
+    actor: 'Karyawan PIC & Driver',
+    description: 'Mobilisasi armada truk pengangkut ke lokasi muat, update status perjalanan, & penanganan kendala.',
+    badgeBg: 'bg-cyan-500/10 border-cyan-500/30',
+    badgeText: 'text-cyan-400',
+  },
+  {
+    step: 4,
+    id: 'submission',
+    name: '4. Submission for Review',
+    shortName: '4 Ajukan',
+    actor: 'Karyawan PIC',
+    description: 'Pengajuan hasil pekerjaan beserta bukti dokumen (min. 1 bukti).',
+    badgeBg: 'bg-indigo-500/10 border-indigo-500/30',
+    badgeText: 'text-indigo-400',
+  },
+  {
+    step: 5,
+    id: 'review',
+    name: '5. Review & Verification',
+    shortName: '5 Review',
+    actor: 'Reviewer / Manager',
+    description: 'Pemeriksaan kelengkapan, kebenaran dokumen, dan hasil fisik.',
+    badgeBg: 'bg-purple-500/10 border-purple-500/30',
+    badgeText: 'text-purple-400',
+  },
+  {
+    step: 6,
+    id: 'follow_up',
+    name: '6. Follow-up & Issue',
+    shortName: '6 Revisi',
+    actor: 'Karyawan PIC',
+    description: 'Penanganan revisi atau kendala yang diminta oleh Reviewer.',
+    badgeBg: 'bg-orange-500/10 border-orange-500/30',
+    badgeText: 'text-orange-400',
+  },
+  {
+    step: 7,
+    id: 'final_approval',
+    name: '7. Final Approval',
+    shortName: '7 Final',
+    actor: 'Manager Operasional',
+    description: 'Persetujuan akhir penutupan pengiriman setelah kriteria terpenuhi.',
+    badgeBg: 'bg-teal-500/10 border-teal-500/30',
+    badgeText: 'text-teal-400',
+  },
+  {
+    step: 8,
+    id: 'closed',
+    name: '8. Done / Closed',
+    shortName: '8 Selesai',
+    actor: 'Sistem (Read-Only)',
+    description: 'Arsip resmi penutupan lead dengan catatan riwayat lengkap.',
+    badgeBg: 'bg-emerald-500/10 border-emerald-500/30',
+    badgeText: 'text-emerald-400',
+  },
+];
+
+export const MANAGER_APPROVAL_CHECKLIST = [
+  'Verifikasi Mitra Perusahaan Transporter, nama supir, dan nomor plat truk pengangkut.',
+  'Dokumen absah kemitraan transportasi (Surat Perjanjian / STNK / SIM B2 Umum Supir) telah terlampir.',
+  'Surat Jalan dan spesifikasi muatan sesuai regulasi keselamatan kimia B3.',
+  'Unit Isotank dalam status TERSEDIA dan lolos inspeksi fisik berkala.',
+  'Target waktu ketibaan (SLA) realistis dengan kondisi rute lalu lintas.',
+];
+
+export const REVIEWER_VERIFICATION_CHECKLIST = [
+  'Dokumen Surat Jalan telah ditandatangani & dicap basah oleh penerima.',
+  'Foto muatan & proses pemuatan/pembongkaran sesuai standar QA.',
+  'Tidak ada isu kendala operasional yang masih berstatus terbuka (Open).',
+];
