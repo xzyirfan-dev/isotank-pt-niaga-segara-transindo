@@ -6,6 +6,8 @@ import { GlobalPeriodFilter } from './components/GlobalPeriodFilter';
 import { GoogleLoginModal } from './components/GoogleLoginModal';
 import { NewLeadModal } from './components/NewLeadModal';
 import { LeadDetailModal } from './components/LeadDetailModal';
+import { AppleToastNotification } from './components/AppleToastNotification';
+import { CommandPalette } from './components/CommandPalette';
 
 import { DashboardView } from './views/DashboardView';
 import { MyTasksView } from './views/MyTasksView';
@@ -14,7 +16,6 @@ import { ReportsView } from './views/ReportsView';
 import { AiRecommendationsView } from './views/AiRecommendationsView';
 import { SystemLogView } from './views/SystemLogView';
 import { AdminView } from './views/AdminView';
-import { EmployeeControlView } from './views/EmployeeControlView';
 
 const MainLayout: React.FC = () => {
   const { activeView, setActiveView, selectedLeadId, setSelectedLeadId } = useApp();
@@ -61,10 +62,6 @@ const MainLayout: React.FC = () => {
             <LeadListView onOpenNewLead={handleOpenNewLeadModal} />
           )}
 
-          {activeView === 'employee_control' && (
-            <EmployeeControlView />
-          )}
-
           {activeView === 'reports' && (
             <ReportsView />
           )}
@@ -77,8 +74,8 @@ const MainLayout: React.FC = () => {
             <SystemLogView />
           )}
 
-          {activeView === 'admin' && (
-            <AdminView />
+          {(activeView === 'admin' || activeView === 'employee_control') && (
+            <AdminView initialTab={activeView === 'employee_control' ? 'karyawan' : 'karyawan'} />
           )}
         </main>
       </div>
@@ -98,6 +95,12 @@ const MainLayout: React.FC = () => {
         leadId={selectedLeadId}
         onClose={() => setSelectedLeadId(null)}
       />
+
+      {/* Global Apple Feedback Toast with Undo */}
+      <AppleToastNotification />
+
+      {/* Global Command Palette (Cmd/Ctrl + K) */}
+      <CommandPalette />
     </div>
   );
 };

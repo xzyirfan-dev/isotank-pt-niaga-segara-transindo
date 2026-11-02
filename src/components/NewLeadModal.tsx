@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, PlusCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, PlusCircle, AlertCircle, CheckCircle2, Ship, Anchor, Truck, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 interface NewLeadModalProps {
@@ -8,7 +8,7 @@ interface NewLeadModalProps {
 }
 
 export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) => {
-  const { assets, users, currentUser, createNewLead, leads } = useApp();
+  const { assets, users, currentUser, createNewLead, leads, checkDuplicateLead } = useApp();
 
   const generateAutoSJ = () => {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
@@ -21,6 +21,17 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
   const [namaSupir, setNamaSupir] = useState('Bambang Susanto (SIM B2 Umum)');
   const [noPlatTruk, setNoPlatTruk] = useState('B 9842 UFX');
   const [transportDocName, setTransportDocName] = useState('Surat_Penunjukan_Transporter_SegaraLogistik.pdf');
+
+  // Inter-Island Sea Freight (Kapal Kargo / Ro-Ro)
+  const [isInterIsland, setIsInterIsland] = useState<boolean>(false);
+  const [shippingCompany, setShippingCompany] = useState<string>('PT Pelayaran Meratus Line');
+  const [vesselName, setVesselName] = useState<string>('KM Meratus Banjar');
+  const [voyageNumber, setVoyageNumber] = useState<string>('VOY-2026/088-SBY-BPN');
+  const [vesselSchedule, setVesselSchedule] = useState<string>('ETD: 02 Nov 18:00 WIB | ETA: 04 Nov 07:00 WITA');
+  const [portOrigin, setPortOrigin] = useState<string>('Pelabuhan Tanjung Perak Surabaya');
+  const [portDestination, setPortDestination] = useState<string>('Pelabuhan Semayang Balikpapan');
+  const [vesselTicketDocName, setVesselTicketDocName] = useState<string>('Tiket_Booking_Kapal_Meratus_VOY088.pdf');
+
   const [assetId, setAssetId] = useState('');
   const [asal, setAsal] = useState('Depo Utama Tuban');
   const [tujuan, setTujuan] = useState('Kawasan Industri Petrokimia Gresik');
@@ -57,17 +68,29 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
     leads.filter(l => l.status !== 'closed').map(l => l.asset_id)
   );
 
+  const selectedAsset = assets.find(a => a.id === assetId);
+  const duplicateStatus = checkDuplicateLead(noSuratJalan, clientCompany, selectedAsset?.code);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!noSuratJalan || !clientCompany || !transportVendorName || !namaSupir || !noPlatTruk || !assetId || !asal || !tujuan || !muatan || !targetAt || !managerId) {
-      setErrorMsg('Seluruh bidang formulir wajib diisi dengan benar termasuk data Mitra Transporter & Driver!');
+    if (duplicateStatus.isDuplicate) {
+      setErrorMsg(`Peringatan Validasi Sistem: ${duplicateStatus.message}. Harap ganti nomor surat jalan atau pilih unit isotank yang berstatus tersedia!`);
       return;
     }
 
-    const selectedAsset = assets.find(a => a.id === assetId);
+    if (!noSuratJalan || !clientCompany || !transportVendorName || !namaSupir || !noPlatTruk || !assetId || !asal || !tujuan || !muatan || !targetAt || !managerId) {
+      setErrorMsg('Seluruh bidang formulir wajib diisi dengan benar termasuk data Klien, Mitra Transporter & Driver!');
+      return;
+    }
+
+    if (isInterIsland && (!shippingCompany || !vesselName || !voyageNumber)) {
+      setErrorMsg('Untuk pengiriman antar-pulau, data Perusahaan Kapal Kargo, Nama Kapal, dan No. Voyage wajib diisi!');
+      return;
+    }
+
     if (!selectedAsset) {
       setErrorMsg('Unit Isotank tidak valid!');
       return;
@@ -85,6 +108,14 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
       nama_supir: namaSupir,
       no_plat_truk: noPlatTruk,
       transport_doc_name: transportDocName || 'Surat_Penunjukan_Transporter.pdf',
+      is_inter_island: isInterIsland,
+      shipping_company: isInterIsland ? shippingCompany : undefined,
+      vessel_name: isInterIsland ? vesselName : undefined,
+      voyage_number: isInterIsland ? voyageNumber : undefined,
+      vessel_schedule: isInterIsland ? vesselSchedule : undefined,
+      port_origin: isInterIsland ? portOrigin : undefined,
+      port_destination: isInterIsland ? portDestination : undefined,
+      vessel_ticket_doc_name: isInterIsland ? (vesselTicketDocName || 'Tiket_Booking_Kapal.pdf') : undefined,
       asset_id: assetId,
       asset_code: selectedAsset.code,
       creator_id: currentUser.id,
@@ -153,6 +184,36 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
             <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* Real-time Duplicate Detection Banner */}
+          {duplicateStatus.isDuplicate && (
+            <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-start space-x-2.5 animate-fadeIn">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-bold flex items-center justify-between text-amber-300">
+                  <span>Deteksi Duplikasi Sistem ({duplicateStatus.field})</span>
+                  {duplicateStatus.field === 'no_surat_jalan' && (
+                    <button
+                      type="button"
+                      onClick={() => setNoSuratJalan(generateAutoSJ())}
+                      className="text-[11px] font-bold text-teal-400 hover:text-teal-300 flex items-center space-x-1 underline"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Acak Ulang No. SJ</span>
+                    </button>
+                  )}
+                </div>
+                <p className="mt-0.5 text-slate-300 text-[11px] leading-relaxed">
+                  {duplicateStatus.message}
+                </p>
+                {duplicateStatus.existingLead && (
+                  <div className="mt-1.5 p-2 rounded-lg bg-slate-900/70 border border-amber-500/20 text-[10px] text-slate-300 font-mono">
+                    <span className="text-amber-400 font-bold">{duplicateStatus.existingLead.lead_code}</span>: {duplicateStatus.existingLead.client_company} · Unit: {duplicateStatus.existingLead.asset_code} · Status: <span className="uppercase text-teal-300">{duplicateStatus.existingLead.status}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -255,10 +316,156 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* Section 3: Rute, Asset, Muatan & SLA */}
+          {/* Section 3: Pencarian & Pemesanan Jasa Kapal Kargo (Rute Luar Pulau) */}
+          <div className="p-3.5 rounded-xl bg-cyan-500/5 border border-cyan-500/30 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center space-x-2">
+                <Ship className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                  3. Pengiriman Luar Pulau (Jasa Kapal Kargo / Ro-Ro)
+                </span>
+              </div>
+
+              <label className="flex items-center space-x-2 cursor-pointer bg-slate-900/80 px-3 py-1 rounded-xl border border-cyan-500/40">
+                <input
+                  type="checkbox"
+                  checked={isInterIsland}
+                  onChange={(e) => setIsInterIsland(e.target.checked)}
+                  className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 bg-slate-800 border-slate-600"
+                />
+                <span className="text-xs font-bold text-cyan-300">
+                  {isInterIsland ? 'Aktif: Rute Luar Pulau' : 'Aktifkan Bila Luar Pulau'}
+                </span>
+              </label>
+            </div>
+
+            {isInterIsland ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-cyan-500/20 animate-fadeIn">
+                {/* Shipping Company / Perusahaan Jasa Kapal */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Nama Perusahaan Jasa Kapal Kargo / Ro-Ro:
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingCompany}
+                    onChange={(e) => setShippingCompany(e.target.value)}
+                    placeholder="Contoh: PT Pelayaran Meratus Line / PT ASDP / PT DLU"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    required={isInterIsland}
+                  />
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    {['PT Pelayaran Meratus Line', 'PT Dharma Lautan Utama', 'PT ASDP Ferry', 'PT Samudera Indonesia'].map((preset) => (
+                      <button
+                        type="button"
+                        key={preset}
+                        onClick={() => setShippingCompany(preset)}
+                        className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                      >
+                        {preset.replace('PT ', '')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Vessel Name / Nama Kapal */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Nama Kapal Kargo / Ro-Ro Pengangkut:
+                  </label>
+                  <input
+                    type="text"
+                    value={vesselName}
+                    onChange={(e) => setVesselName(e.target.value)}
+                    placeholder="Contoh: KM Meratus Banjar / KMP Dharma Rucitra VII"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    required={isInterIsland}
+                  />
+                </div>
+
+                {/* Voyage Number / ID Perjalanan */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    No. Perjalanan / Voyage ID / Manifest ID:
+                  </label>
+                  <input
+                    type="text"
+                    value={voyageNumber}
+                    onChange={(e) => setVoyageNumber(e.target.value)}
+                    placeholder="Contoh: VOY-2026/088-SBY-BPN"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-cyan-300 focus:border-cyan-500 focus:outline-none"
+                    required={isInterIsland}
+                  />
+                </div>
+
+                {/* Vessel Schedule / Jadwal Pelayaran */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Jadwal Pelayaran (ETD Keberangkatan & ETA Kedatangan):
+                  </label>
+                  <input
+                    type="text"
+                    value={vesselSchedule}
+                    onChange={(e) => setVesselSchedule(e.target.value)}
+                    placeholder="Contoh: ETD: 02 Nov 18:00 WIB | ETA: 04 Nov 07:00 WITA"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    required={isInterIsland}
+                  />
+                </div>
+
+                {/* Port Origin */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Pelabuhan Asal Muat Kapal:</label>
+                  <input
+                    type="text"
+                    value={portOrigin}
+                    onChange={(e) => setPortOrigin(e.target.value)}
+                    placeholder="Contoh: Pelabuhan Tanjung Perak Surabaya"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Port Destination */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Pelabuhan Tujuan Bongkar Kapal:</label>
+                  <input
+                    type="text"
+                    value={portDestination}
+                    onChange={(e) => setPortDestination(e.target.value)}
+                    placeholder="Contoh: Pelabuhan Semayang Balikpapan"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Vessel Booking Document / Ticket */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Lampiran Bukti Form Pemesanan / Tiket Jasa Kapal (PDF/JPG):
+                  </label>
+                  <input
+                    type="text"
+                    value={vesselTicketDocName}
+                    onChange={(e) => setVesselTicketDocName(e.target.value)}
+                    placeholder="Nama Berkas Tiket (Contoh: Tiket_Booking_Kapal_Meratus_VOY088.pdf)"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    required={isInterIsland}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Formulir pemesanan / tiket penyeberangan ini akan ditinjau dan diverifikasi oleh Manager Operasional pada Stage 2 Approval.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">
+                Centang opsi di atas apabila rute pengiriman melintasi pulau (misal: Jawa ➔ Kalimantan, Sumatera, Sulawesi, dll.) untuk mencantumkan data kapal kargo & tiket penyeberangan.
+              </p>
+            )}
+          </div>
+
+          {/* Section 4: Rute, Asset, Muatan & SLA */}
           <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/80 space-y-3">
             <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-              3. Detail Rute, Unit Isotank & Target SLA
+              4. Detail Rute, Unit Isotank & Target SLA
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   X, Truck, Clock, ShieldCheck, FileText, CheckCircle2, AlertCircle,
   MessageSquare, Upload, AlertTriangle, Printer, ExternalLink, ChevronRight,
-  UserCheck, ArrowRight, CornerDownRight, Check, Eye, Download
+  UserCheck, ArrowRight, CornerDownRight, Check, Eye, Download, Ship, Anchor
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { STAGE_LIST } from '../data/stageConfig';
@@ -17,14 +17,20 @@ interface LeadDetailModalProps {
 
 export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClose }) => {
   const {
-    leads, evidences, issues, comments, currentUser, auditLogs,
-    addIssue, resolveIssue, addComment, transitionLeadStage
+    leads, evidences, issues, comments, currentUser, auditLogs, users,
+    addIssue, resolveIssue, addComment, transitionLeadStage,
+    updateLeadVesselBooking, updateLeadFinalDelivery,
+    detailDisplayMode, setDetailDisplayMode, requestRevisionWithReason
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'timeline' | 'jejak_bukti' | 'issues' | 'comments'>('timeline');
   const [newIssueDesc, setNewIssueDesc] = useState('');
   const [newCommentMsg, setNewCommentMsg] = useState('');
   const [activeViewerEvidence, setActiveViewerEvidence] = useState<any>(null);
+
+  // Mandatory Reason for Rejection / Revision modal
+  const [isRevisionReasonOpen, setIsRevisionReasonOpen] = useState(false);
+  const [mandatoryReasonText, setMandatoryReasonText] = useState('');
 
   // Modals for actions
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
@@ -77,10 +83,32 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
     window.print();
   };
 
+  const isDrawer = detailDisplayMode === 'drawer';
+
+  const renderMessageWithMentions = (text: string) => {
+    const parts = text.split(/(@[A-Za-z\s]+?)(?=[.,!?:;]|\s|$)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return (
+          <span key={i} className="inline-block px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30 text-[11px] mr-0.5">
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-        <div className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95">
+      <div className={`fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex ${
+        isDrawer ? 'justify-end overflow-hidden' : 'items-center justify-center p-2 sm:p-4 overflow-y-auto'
+      }`}>
+        <div className={`${
+          isDrawer
+            ? 'w-full max-w-2xl h-full border-l border-slate-700 shadow-2xl'
+            : 'w-full max-w-4xl rounded-2xl border border-slate-700 shadow-2xl my-auto max-h-[92vh]'
+        } bg-slate-900 overflow-hidden flex flex-col animate-fadeIn`}>
           
           {/* Header Bar */}
           <div className="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 shrink-0">
@@ -90,11 +118,11 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
               </div>
               <div>
                 <div className="flex items-center space-x-2 flex-wrap">
-                  <span className="px-2.5 py-0.5 rounded text-xs font-mono font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-mono font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/40 tabular-nums">
                     {lead.lead_code || 'LEAD-00101'}
                   </span>
                   <span className="font-extrabold text-slate-100 text-base font-mono">{lead.no_surat_jalan}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-teal-300">
+                  <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-teal-300 font-mono">
                     Aset: {lead.asset_code}
                   </span>
                 </div>
@@ -106,7 +134,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
 
             <div className="flex items-center space-x-2">
               {/* SLA Badge */}
-              <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center space-x-1 ${
+              <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center space-x-1 tabular-nums ${
                 isClosed
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                   : isOverdue
@@ -118,6 +146,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                   {isClosed ? 'Closed (Selesai)' : isOverdue ? `Terlambat SLA (${Math.abs(diffHours)}j)` : `Sisa SLA: ${diffHours} Jam`}
                 </span>
               </div>
+
+              {/* Drawer vs Modal Toggle */}
+              <button
+                onClick={() => setDetailDisplayMode(isDrawer ? 'modal' : 'drawer')}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-colors no-print"
+                title={isDrawer ? 'Beralih ke Tampilan Modal Layar Penuh' : 'Beralih ke Tampilan Drawer Samping'}
+              >
+                {isDrawer ? '⤢ Modal' : '⇥ Drawer'}
+              </button>
 
               <button
                 onClick={handlePrint}
@@ -136,8 +173,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
           {/* Stepper Progress Bar */}
           <div className="bg-slate-900 px-6 py-4 border-b border-slate-800 shrink-0">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-2">
-              <span>Status Alur 8 Tahap Operasional:</span>
-              <span className="text-teal-400 font-mono">Stage {lead.current_step} dari 8 ({lead.progress_percentage}%)</span>
+              <span className="flex items-center space-x-2">
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping inline-block" />
+                <span>Alur Transaksional 8 Tahap Operasional:</span>
+              </span>
+              <span className="text-teal-400 font-mono tabular-nums text-xs font-bold">
+                Tahap {lead.current_step} dari 8 ({lead.progress_percentage}%)
+              </span>
             </div>
 
             <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden mb-4">
@@ -147,24 +189,31 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
               />
             </div>
 
-            {/* Stepper items */}
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-1 text-center">
+            {/* Stepper items with strict contrast and weight separation */}
+            <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-center">
               {STAGE_LIST.map((stg) => {
-                const isPassed = lead.current_step > stg.step;
-                const isCurrent = lead.current_step === stg.step;
+                const isPassed = lead.current_step > stg.step || isClosed;
+                const isCurrent = lead.current_step === stg.step && !isClosed;
                 return (
                   <div key={stg.step} className="flex flex-col items-center">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      isPassed
-                        ? 'bg-teal-500 text-slate-950'
-                        : isCurrent
-                        ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-400/20'
-                        : 'bg-slate-800 text-slate-500 border border-slate-700'
-                    }`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs transition-all ${
+                        isCurrent
+                          ? 'bg-white text-slate-950 font-black ring-4 ring-teal-400/50 shadow-lg scale-105 z-10'
+                          : isPassed
+                          ? 'bg-teal-500 text-slate-950 font-bold shadow-sm shadow-teal-500/20'
+                          : 'bg-slate-800/80 text-slate-500 border border-slate-700/60 font-medium'
+                      }`}
+                      aria-current={isCurrent ? 'step' : undefined}
+                    >
                       {isPassed ? <Check className="w-4 h-4 stroke-[3]" /> : stg.step}
                     </div>
-                    <span className={`text-[10px] mt-1 font-semibold truncate w-full ${
-                      isCurrent ? 'text-amber-400' : isPassed ? 'text-teal-300' : 'text-slate-500'
+                    <span className={`text-[10px] mt-1.5 truncate w-full ${
+                      isCurrent
+                        ? 'text-white font-black underline underline-offset-2 decoration-teal-400'
+                        : isPassed
+                        ? 'text-slate-200 font-semibold'
+                        : 'text-slate-500 font-normal'
                     }`}>
                       {stg.shortName}
                     </span>
@@ -172,6 +221,52 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                 );
               })}
             </div>
+
+            {/* Active Stage & PIC Banner */}
+            {(() => {
+              const currentStageInfo = STAGE_LIST.find(s => s.step === lead.current_step) || STAGE_LIST[0];
+              return (
+                <div className="mt-4 p-3.5 rounded-xl bg-slate-950/80 border border-teal-500/40 shadow-inner flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 font-black text-sm shrink-0">
+                      {lead.current_step}
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2 flex-wrap">
+                        <span className="text-[11px] uppercase tracking-wider font-extrabold text-teal-400">
+                          Tahap Aktif: {currentStageInfo.name}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-semibold">
+                          Aktor: {currentStageInfo.actor}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-200 mt-0.5 font-medium leading-relaxed">
+                        {currentStageInfo.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-4 shrink-0 text-xs pl-2 border-l border-slate-800">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold">PIC Pelaksana:</span>
+                      <span className="text-slate-100 font-bold">{lead.pic_name || 'Budi Santoso'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold">Status Tahap:</span>
+                      <span className="text-teal-300 font-bold">
+                        {lead.current_step === 8
+                          ? 'Arsip Final Selesai'
+                          : lead.current_step === 6
+                          ? 'Perlu Revisi PIC'
+                          : lead.current_step === 2 || lead.current_step === 7
+                          ? 'Menunggu Approval'
+                          : 'Dalam Proses'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Tab Navigation */}
@@ -305,6 +400,191 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                   </button>
                 </div>
 
+                {/* Inter-Island Sea Freight (Kapal Kargo) Section */}
+                {lead.is_inter_island ? (
+                  <div className="p-4 rounded-xl bg-cyan-950/40 border border-cyan-500/40 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/20 pb-2.5">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300">
+                          <Ship className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold text-slate-100 text-xs">Pencarian & Pemesanan Kapal Kargo Antar-Pulau</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                              MULTIMODA SEA FREIGHT
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-cyan-300/80">Pengangkutan Truk & Unit Isotank via Kapal Laut</span>
+                        </div>
+                      </div>
+
+                      {lead.vessel_ticket_doc_name && (
+                        <button
+                          onClick={() => setActiveViewerEvidence({
+                            id: `ev-ship-${lead.id}`,
+                            lead_id: lead.id,
+                            lead_code: lead.lead_code || 'LEAD-00101',
+                            stage: 'lead_approval',
+                            stage_step: 2,
+                            file_type: 'tiket_kapal',
+                            file_name: lead.vessel_ticket_doc_name,
+                            file_size: '2.1 MB',
+                            uploaded_at: lead.created_at,
+                            uploaded_by: lead.creator_name,
+                            uploaded_by_role: 'karyawan',
+                            notes: `Form Pemesanan / Tiket Kapal Kargo Resmi: Perusahaan ${lead.shipping_company || '-'}, Kapal ${lead.vessel_name || '-'}, No. Voyage / ID Perjalanan: ${lead.voyage_number || '-'}, Rute: ${lead.port_origin || '-'} -> ${lead.port_destination || '-'}, Jadwal: ${lead.vessel_schedule || '-'}.`,
+                          })}
+                          className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-sm"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Lihat & Unduh Tiket Kapal</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Perusahaan Jasa Kapal:</span>
+                        <strong className="text-cyan-200 font-bold">{lead.shipping_company || '-'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Nama Kapal & No. Perjalanan (Voyage):</span>
+                        <strong className="text-slate-100">{lead.vessel_name || '-'} {lead.voyage_number ? `(${lead.voyage_number})` : ''}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Pelabuhan Muat &rarr; Bongkar:</span>
+                        <span className="text-slate-200 font-medium">{lead.port_origin || '-'} &rarr; {lead.port_destination || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Jadwal Keberangkatan & Ketibaan:</span>
+                        <span className="text-amber-300 font-medium">{lead.vessel_schedule || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/60 text-xs flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-slate-400">
+                      <Truck className="w-4 h-4 text-slate-500" />
+                      <span>Rute Darat Reguler (Bila memerlukan kapal penyeberangan kargo antar-pulau, dapat diaktifkan)</span>
+                    </div>
+                    {!isClosed && (
+                      <button
+                        onClick={() => {
+                          const shipCo = prompt('Nama Perusahaan Jasa Kapal Kargo:', 'PT Pelayaran Meratus Line');
+                          if (shipCo) {
+                            const shipName = prompt('Nama Kapal & No. Voyage / Perjalanan:', 'KM Meratus Banjar - VOY-8841');
+                            const sched = prompt('Jadwal Keberangkatan / Ketibaan (ETD/ETA):', 'ETD: Hari +1 19:00 WIB | ETA: Hari +3 08:00 WITA');
+                            const pOrigin = prompt('Pelabuhan Asal Muat:', 'Pelabuhan Tanjung Perak, Surabaya');
+                            const pDest = prompt('Pelabuhan Tujuan Bongkar:', 'Pelabuhan Trisakti, Banjarmasin');
+                            const ticketDoc = prompt('Nama Berkas Tiket/Form Pemesanan Kapal:', 'Form_Booking_Tiket_Kapal_Resmi.pdf');
+                            updateLeadVesselBooking(lead.id, {
+                              is_inter_island: true,
+                              shipping_company: shipCo,
+                              vessel_name: shipName || 'KM Kargo Niaga',
+                              voyage_number: 'VOY-REGULER',
+                              vessel_schedule: sched || 'Jadwal Reguler',
+                              port_origin: pOrigin || 'Pelabuhan Muat',
+                              port_destination: pDest || 'Pelabuhan Bongkar',
+                              vessel_ticket_doc_name: ticketDoc || 'Form_Booking_Tiket_Kapal.pdf'
+                            });
+                          }
+                        }}
+                        className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold underline"
+                      >
+                        + Tambah Pengiriman Kapal Antar-Pulau
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Final Delivery Arrival Proof (Dokumen / Foto Sampai Tujuan - BASTP) */}
+                {lead.final_delivery_doc_name ? (
+                  <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2.5">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold text-slate-100 text-xs">Bukti Dokumen / Foto Pengiriman Telah Sampai Tujuan</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              STATUS: TIBA DI TUJUAN (BASTP SAH)
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-emerald-300/80">Dokumen Absah Penyelesaian Lead & Verifikasi Final Ketibaan</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveViewerEvidence({
+                          id: `ev-arrival-${lead.id}`,
+                          lead_id: lead.id,
+                          lead_code: lead.lead_code || 'LEAD-00101',
+                          stage: 'final_approval',
+                          stage_step: 7,
+                          file_type: 'bukti_sampai_tujuan',
+                          file_name: lead.final_delivery_doc_name || 'BASTP_Bukti_Sampai_Tujuan.pdf',
+                          file_size: '2.4 MB',
+                          uploaded_at: lead.final_delivery_date || new Date().toISOString(),
+                          uploaded_by: lead.final_delivery_received_by || 'Staff Gudang Penerima',
+                          uploaded_by_role: 'reviewer',
+                          notes: `Verifikasi Kedatangan: Muatan isotank ${lead.asset_code} telah sampai di tujuan (${lead.tujuan}) dengan selamat. Diterima dan ditandatangani oleh: ${lead.final_delivery_received_by}. Berita Acara Serah Terima & Foto Ketibaan telah diverifikasi sah.`,
+                        })}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-sm"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Lihat & Unduh Bukti Sampai Tujuan</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Nama Berkas Absah:</span>
+                        <strong className="text-emerald-300 font-mono text-[11px]">{lead.final_delivery_doc_name}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Diterima & Ditandatangani Oleh:</span>
+                        <strong className="text-slate-100">{lead.final_delivery_received_by || 'Supervisor Gudang Penerima'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Waktu / Tanggal Kedatangan:</span>
+                        <span className="text-slate-200">{lead.final_delivery_date || 'Tercatat Sesuai Berita Acara'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  (lead.current_step >= 6 || lead.status === 'final_approval') && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2 text-amber-300">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                        <div>
+                          <span className="font-bold block">Dokumen / Foto Bukti Sampai Tujuan Belum Terlampir</span>
+                          <span className="text-[11px] text-amber-300/80">Untuk menyelesaikan lead ke Stage 8 (Closed), lampirkan dokumen BASTP atau foto ketibaan di tujuan.</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const doc = prompt('Masukkan nama berkas BASTP / Foto Ketibaan Tujuan:', `BASTP_${lead.no_surat_jalan}_Tiba.pdf`);
+                          if (doc) {
+                            const receiver = prompt('Nama Petugas/Penerima di Lokasi Tujuan:', 'Bpk. Hendrawan (Supervisor Gudang Pabrik)');
+                            updateLeadFinalDelivery(lead.id, {
+                              final_delivery_doc_name: doc,
+                              final_delivery_received_by: receiver || 'Penerima Gudang Tujuan',
+                              final_delivery_date: new Date().toLocaleString('id-ID')
+                            });
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+                      >
+                        + Lampirkan Bukti Ketibaan Sekarang
+                      </button>
+                    </div>
+                  )
+                )}
+
                 {/* Location Note */}
                 {lead.current_location_note && (
                   <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-300 flex items-center space-x-2">
@@ -423,7 +703,29 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                             </td>
                             <td className="p-3 font-semibold text-teal-300">Tahap {ev.stage_step}</td>
                             <td className="p-3 font-mono text-[11px] text-slate-400">{ev.log_number || 'LOG-SYSTEM'}</td>
-                            <td className="p-3 capitalize">{ev.file_type.replace('_', ' ')}</td>
+                            <td className="p-3">
+                              {ev.file_type === 'tiket_kapal' ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 inline-flex items-center space-x-1">
+                                  <span>🚢 Tiket Kapal</span>
+                                </span>
+                              ) : ev.file_type === 'bukti_sampai_tujuan' ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-flex items-center space-x-1">
+                                  <span>✓ BASTP / Sampai Tujuan</span>
+                                </span>
+                              ) : ev.file_type === 'dokumen_transporter' ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  Dokumen Transporter
+                                </span>
+                              ) : ev.file_type === 'surat_jalan' ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                                  Surat Jalan Resmi
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 capitalize">
+                                  {ev.file_type.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                            </td>
                             <td className="p-3 font-bold text-slate-100 flex items-center space-x-1.5">
                               <FileText className="w-3.5 h-3.5 text-teal-400" />
                               <span>{ev.file_name}</span>
@@ -531,43 +833,63 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
               </div>
             )}
 
-            {/* TAB 4: COMMENTS */}
+            {/* TAB 4: COMMENTS WITH @MENTIONS */}
             {activeTab === 'comments' && (
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-slate-200">Diskusi & Riwayat Komentar</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-200">Diskusi Internal & Catatan Alur Kerja</h4>
+                  <span className="text-[10px] text-slate-400">Gunakan @nama untuk mention rekan tim</span>
+                </div>
 
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                   {leadComments.length === 0 ? (
                     <div className="text-center py-6 text-xs text-slate-400">Belum ada komentar.</div>
                   ) : (
                     leadComments.map((cmt) => (
-                      <div key={cmt.id} className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/80 text-xs">
-                        <div className="flex items-center justify-between mb-1">
+                      <div key={cmt.id} className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/80 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-200">{cmt.user_name} ({cmt.user_role.toUpperCase()})</span>
                           <span className="text-[10px] text-slate-400">{cmt.created_at}</span>
                         </div>
-                        <p className="text-slate-300">{cmt.message}</p>
+                        <p className="text-slate-300 leading-relaxed">{renderMessageWithMentions(cmt.message)}</p>
                       </div>
                     ))
                   )}
                 </div>
 
                 {!isClosed && (
-                  <form onSubmit={handleCreateComment} className="flex gap-2 pt-2 border-t border-slate-800">
-                    <input
-                      type="text"
-                      value={newCommentMsg}
-                      onChange={(e) => setNewCommentMsg(e.target.value)}
-                      placeholder="Tulis pesan komentar diskusi tim..."
-                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-teal-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-teal-400 shadow-md"
-                    >
-                      Kirim Pesan
-                    </button>
-                  </form>
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    {/* Quick Mention Pills */}
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-y-1 text-[11px] text-slate-400">
+                      <span>Mention:</span>
+                      {users.slice(0, 4).map(u => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => setNewCommentMsg(prev => prev + `@${u.name} `)}
+                          className="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 text-[10px] font-semibold transition-colors"
+                        >
+                          @{u.name.split(' ')[0]}
+                        </button>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleCreateComment} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCommentMsg}
+                        onChange={(e) => setNewCommentMsg(e.target.value)}
+                        placeholder="Tulis pesan komentar diskusi tim (@Budi, @Probo)..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-teal-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-teal-400 shadow-md active:scale-95 transition-all"
+                      >
+                        Kirim Pesan
+                      </button>
+                    </form>
+                  </div>
                 )}
               </div>
             )}
@@ -653,15 +975,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                 {lead.current_step === 5 && (currentUser.role === 'reviewer' || currentUser.role === 'manager' || currentUser.role === 'admin') && (
                   <>
                     <button
-                      onClick={() => setApprovalModalConfig({
-                        isOpen: true,
-                        actionType: 'request_revision_stage_5',
-                        targetStage: 'follow_up',
-                        targetStep: 6,
-                      })}
+                      onClick={() => setIsRevisionReasonOpen(true)}
                       className="px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs rounded-xl"
                     >
-                      Minta Perbaikan (Revisi)
+                      Minta Revisi (Alasan Wajib)
                     </button>
                     <button
                       onClick={() => setApprovalModalConfig({
@@ -740,6 +1057,50 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
         onClose={() => setActiveViewerEvidence(null)}
         evidence={activeViewerEvidence}
       />
+
+      {/* Mandatory Revision Reason Modal */}
+      {isRevisionReasonOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-5 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center space-x-2 text-rose-400">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h3 className="font-bold text-sm text-slate-100">Alasan Wajib Penolakan / Permintaan Revisi</h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Sesuai aturan kepatuhan operasional PT Niaga Segara Trasindo, Anda wajib mencantumkan alasan spesifik dan perbaikan yang diminta agar Karyawan PIC dapat menindaklanjutinya pada Tahap 6 (Follow-up).
+            </p>
+            <textarea
+              rows={3}
+              value={mandatoryReasonText}
+              onChange={(e) => setMandatoryReasonText(e.target.value)}
+              placeholder="Tuliskan kendala spesifik: misal berkas STNK buram, valve bocor, atau kekurangan tanda tangan BASTP..."
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 focus:border-rose-500 focus:outline-none"
+            />
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setIsRevisionReasonOpen(false);
+                  setMandatoryReasonText('');
+                }}
+                className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+              >
+                Batal
+              </button>
+              <button
+                disabled={!mandatoryReasonText.trim()}
+                onClick={() => {
+                  requestRevisionWithReason(leadId, mandatoryReasonText.trim());
+                  setIsRevisionReasonOpen(false);
+                  setMandatoryReasonText('');
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs shadow-md transition-all"
+              >
+                Kirim Permintaan Revisi (Stage 6)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

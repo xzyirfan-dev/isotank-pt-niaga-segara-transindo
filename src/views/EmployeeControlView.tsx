@@ -6,7 +6,11 @@ import {
 import { useApp } from '../context/AppContext';
 import { User, UserRole } from '../types';
 
-export const EmployeeControlView: React.FC = () => {
+interface EmployeeControlViewProps {
+  compactHeader?: boolean;
+}
+
+export const EmployeeControlView: React.FC<EmployeeControlViewProps> = ({ compactHeader = false }) => {
   const {
     users,
     currentUser,
@@ -79,35 +83,68 @@ export const EmployeeControlView: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      {/* Header Banner */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700/80 shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[11px] uppercase font-bold tracking-wider flex items-center space-x-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>MANAGER FULL CONTROL ACCESS & GOOGLE SYNC</span>
-            </span>
-            <span className="text-slate-400 text-xs">· PT Niaga Segara Trasindo</span>
+      {/* Header Banner / Action Bar */}
+      {!compactHeader ? (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700/80 shadow-xl flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center space-x-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[11px] uppercase font-bold tracking-wider flex items-center space-x-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>MANAGER FULL CONTROL ACCESS & GOOGLE SYNC</span>
+              </span>
+              <span className="text-slate-400 text-xs">· PT Niaga Segara Trasindo</span>
+            </div>
+            <h1 className="text-xl font-extrabold text-slate-100 tracking-tight flex items-center space-x-2">
+              <Users className="w-6 h-6 text-teal-400" />
+              <span>Pengaturan & Kontrol Akun Karyawan</span>
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+              Modul kontrol penuh Manager ({currentUser.name}) untuk registrasi, pengeditan hak akses, penangguhan status, dan sinkronisasi otomatis dengan Akun Google.
+            </p>
           </div>
-          <h1 className="text-xl font-extrabold text-slate-100 tracking-tight flex items-center space-x-2">
-            <Users className="w-6 h-6 text-teal-400" />
-            <span>Pengaturan & Kontrol Akun Karyawan</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Modul kontrol penuh Manager ({currentUser.name}) untuk registrasi, pengeditan hak akses, penangguhan status, dan sinkronisasi otomatis dengan Akun Google.
-          </p>
-        </div>
 
-        {isManagerOrAdmin && (
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-lg shadow-teal-500/20 transition-all hover:scale-105"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>+ Tambah Karyawan Baru</span>
-          </button>
-        )}
-      </div>
+          {isManagerOrAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-lg shadow-teal-500/20 transition-all hover:scale-105"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Tambah Karyawan Baru</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="font-extrabold text-slate-100 text-sm">
+                  Pengaturan Karyawan, Hak Akses & Google Sync
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                  Google Linked
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Otorisasi peran (RBAC), penangguhan/aktivasi akun, reset kredensial PIN SSL, serta pemantauan beban lead karyawan.
+              </p>
+            </div>
+          </div>
+
+          {isManagerOrAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-md shadow-teal-500/20 transition-all hover:scale-105"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Tambah Karyawan Baru</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {!isManagerOrAdmin && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">

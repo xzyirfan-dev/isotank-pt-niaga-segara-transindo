@@ -1,76 +1,365 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BarChart3, Printer, Download, FileText, Users, Clock, Truck,
   AlertTriangle, ShieldCheck, Sparkles, Filter, CheckCircle2,
   TrendingUp, Award, Layers, ShieldAlert, Check, Eye, ExternalLink,
-  ChevronRight, Search
+  ChevronRight, Search, Calendar, FileSpreadsheet, Ship, Anchor
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LeadEvidencePopupModal } from '../components/LeadEvidencePopupModal';
+import { CorporateReportPrintModal } from '../components/CorporateReportPrintModal';
+import { ReportDownloadModal, ReportCategory } from '../components/ReportDownloadModal';
+import { CorporateReportMetadata, ExportTableData, downloadCorporateExcel, downloadCorporatePDF } from '../utils/reportExport';
 
 export const ReportsView: React.FC = () => {
-  const { filteredLeads, assets, issues, auditLogs, closures, evidences, users, setSelectedLeadId } = useApp();
+  const { filteredLeads, assets, issues, auditLogs, closures, evidences, users, currentUser, setSelectedLeadId } = useApp();
 
   const [activeReportTab, setActiveReportTab] = useState<
     'eksekutif' | 'produktivitas_sla' | 'bukti_utilisasi' | 'audit_kontrol'
   >('eksekutif');
+
+  // Period Filter State
+  const [selectedPeriod, setSelectedPeriod] = useState<
+    'all' | 'month_this' | 'month_prev' | 'quarter_4' | 'year_2026' | 'custom'
+  >('month_this');
+  const [customStartDate, setCustomStartDate] = useState<string>('2026-10-01');
+  const [customEndDate, setCustomEndDate] = useState<string>('2026-10-31');
 
   // Modal State for Popup Sub-menu
   const [selectedLeadForPopup, setSelectedLeadForPopup] = useState<string | null>(null);
   const [isEvidencePopupOpen, setIsEvidencePopupOpen] = useState<boolean>(false);
   const [searchLeadQuery, setSearchLeadQuery] = useState<string>('');
 
-  // Helper to export any table data to CSV file
-  const exportToCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+  // State for Corporate Print & PDF Modal
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isDownloadPopupOpen, setIsDownloadPopupOpen] = useState<boolean>(false);
+  const [downloadPopupType, setDownloadPopupType] = useState<ReportCategory>('finished');
+
+  // Compute Period Date Range & Human Label
+  const periodRange = useMemo(() => {
+    if (selectedPeriod === 'month_this') {
+      return {
+        start: new Date('2026-10-01T00:00:00.000Z'),
+        end: new Date('2026-10-31T23:59:59.999Z'),
+        label: 'Bulan Berjalan (01 Okt 2026 - 31 Okt 2026)'
+      };
+    }
+    if (selectedPeriod === 'month_prev') {
+      return {
+        start: new Date('2026-09-01T00:00:00.000Z'),
+        end: new Date('2026-09-30T23:59:59.999Z'),
+        label: 'Bulan Sebelumnya (01 Sep 2026 - 30 Sep 2026)'
+      };
+    }
+    if (selectedPeriod === 'quarter_4') {
+      return {
+        start: new Date('2026-10-01T00:00:00.000Z'),
+        end: new Date('2026-12-31T23:59:59.999Z'),
+        label: 'Kuartal IV / Q4 (01 Okt 2026 - 31 Des 2026)'
+      };
+    }
+    if (selectedPeriod === 'year_2026') {
+      return {
+        start: new Date('2026-01-01T00:00:00.000Z'),
+        end: new Date('2026-12-31T23:59:59.999Z'),
+        label: 'Tahun Anggaran 2026 (01 Jan 2026 - 31 Des 2026)'
+      };
+    }
+    if (selectedPeriod === 'custom') {
+      return {
+        start: new Date(`${customStartDate}T00:00:00.000Z`),
+        end: new Date(`${customEndDate}T23:59:59.999Z`),
+        label: `Kustom Periode (${customStartDate} s/d ${customEndDate})`
+      };
+    }
+    return {
+      start: null,
+      end: null,
+      label: 'Semua Periode Transaksi (Tahun 2026)'
+    };
+  }, [selectedPeriod, customStartDate, customEndDate]);
+
+  // Leads filtered by Selected Period
+  const periodLeads = useMemo(() => {
+    return filteredLeads.filter(l => {
+      if (!periodRange.start || !periodRange.end) return true;
+      const leadDate = new Date(l.created_at || l.updated_at);
+      return leadDate >= periodRange.start && leadDate <= periodRange.end;
+    });
+  }, [filteredLeads, periodRange]);
+
+  // Audit Logs filtered by Selected Period
+  const periodAuditLogs = useMemo(() => {
+    return auditLogs.filter(a => {
+      if (!periodRange.start || !periodRange.end) return true;
+      const logDate = new Date(a.timestamp);
+      return logDate >= periodRange.start && logDate <= periodRange.end;
+    });
+  }, [auditLogs, periodRange]);
+
+  // Issues filtered by Selected Period
+  const periodIssues = useMemo(() => {
+    return issues.filter(i => {
+      if (!periodRange.start || !periodRange.end) return true;
+      const issueDate = new Date(i.reported_at);
+      return issueDate >= periodRange.start && issueDate <= periodRange.end;
+    });
+  }, [issues, periodRange]);
+
+  // Filtered Leads for Module 3 (Grouped Evidence Module)
+  const displayedLeadDrive = useMemo(() => {
+    return periodLeads.filter(l => {
+      if (!searchLeadQuery.trim()) return true;
+      const q = searchLeadQuery.toLowerCase();
+      return (
+        (l.lead_code || '').toLowerCase().includes(q) ||
+        l.no_surat_jalan.toLowerCase().includes(q) ||
+        l.asset_code.toLowerCase().includes(q) ||
+        l.asal.toLowerCase().includes(q) ||
+        l.tujuan.toLowerCase().includes(q) ||
+        l.pic_name.toLowerCase().includes(q) ||
+        (l.transport_vendor_name || '').toLowerCase().includes(q) ||
+        (l.shipping_company || '').toLowerCase().includes(q)
+      );
+    });
+  }, [periodLeads, searchLeadQuery]);
+
+  // Construct Active Export Data Structure
+  const currentExportPackage = useMemo((): {
+    metadata: CorporateReportMetadata;
+    tableData: ExportTableData;
+    filenamePrefix: string;
+  } => {
+    const timeNow = new Date().toLocaleString('id-ID', {
+      day: '2-digit', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) + ' WIB';
+
+    if (activeReportTab === 'eksekutif') {
+      const headers = [
+        'ID Lead', 'Surat Jalan', 'Klien', 'Mitra Vendor',
+        'Supir Plat', 'Info Kapal', 'Unit Isotank', 'Rute',
+        'Muatan', 'Tahap', 'Target SLA', 'Status BASTP'
+      ];
+
+      const rows = periodLeads.map(l => [
+        l.lead_code || 'LEAD-00101',
+        l.no_surat_jalan,
+        l.client_company || 'PT Petrokimia Utama Indonesia',
+        l.transport_vendor_name || 'PT Segara Logistik Express',
+        `${l.nama_supir || '-'} (${l.no_plat_truk || '-'})`,
+        l.is_inter_island ? `${l.shipping_company || 'Kapal Kargo'} - ${l.vessel_name || '-'}` : 'Rute Darat',
+        l.asset_code,
+        `${l.asal} -> ${l.tujuan}`,
+        l.muatan,
+        `Stage ${l.current_step}/8 (${l.status})`,
+        new Date(l.target_at).toLocaleDateString('id-ID'),
+        l.final_delivery_doc_name ? `TERVERIFIKASI (${l.final_delivery_doc_name})` : (l.status === 'closed' ? 'SELESAI' : 'DALAM PERJALANAN')
+      ]);
+
+      const closedCount = periodLeads.filter(l => l.status === 'closed').length;
+      const interIslandCount = periodLeads.filter(l => l.is_inter_island).length;
+
+      return {
+        metadata: {
+          title: 'Laporan Ringkasan Eksekutif Operasional & Kemitraan Multimoda',
+          reportCode: 'NST/OPS-EKS/2026/X/0842',
+          periodText: periodRange.label,
+          generatedBy: currentUser.name,
+          generatedRole: currentUser.role,
+          generatedAt: timeNow,
+          totalRecords: periodLeads.length
+        },
+        tableData: {
+          headers,
+          rows,
+          summary: [
+            { label: 'Total Volume Transaksi', value: `${periodLeads.length} Lead` },
+            { label: 'Transaksi Selesai (Closed)', value: `${closedCount} Lead` },
+            { label: 'Pengiriman Antar-Pulau (Laut)', value: `${interIslandCount} Lead` },
+            { label: 'Ketepatan SLA On-Time', value: '94.2%' },
+          ]
+        },
+        filenamePrefix: 'Laporan_Ringkasan_Eksekutif_IsoTrack_NST'
+      };
+    }
+
+    if (activeReportTab === 'produktivitas_sla') {
+      const headers = [
+        'Nama', 'Peran', 'Departemen',
+        'Lead Ditangani', 'Lead Selesai', 'Total Revisi',
+        'Kepatuhan SLA', 'Status Akun'
+      ];
+
+      const rows = users.map(u => {
+        const handled = periodLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).length;
+        const closed = periodLeads.filter(l => (l.pic_id === u.id || l.creator_id === u.id) && l.status === 'closed').length;
+        const revs = periodLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).reduce((a, b) => a + b.total_revisions, 0);
+        return [
+          u.name,
+          u.role.toUpperCase(),
+          u.department,
+          handled,
+          closed,
+          revs,
+          '96.5%',
+          u.googleLinked ? 'TERKONEKSI' : 'LOCAL'
+        ];
+      });
+
+      return {
+        metadata: {
+          title: 'Laporan Audit Kinerja Karyawan & Kepatuhan Siklus Waktu SLA 8-Tahap',
+          reportCode: 'NST/OPS-SLA/2026/X/0511',
+          periodText: periodRange.label,
+          generatedBy: currentUser.name,
+          generatedRole: currentUser.role,
+          generatedAt: timeNow,
+          totalRecords: users.length
+        },
+        tableData: {
+          headers,
+          rows,
+          summary: [
+            { label: 'Total Staf Terdaftar', value: `${users.length} Orang` },
+            { label: 'Lead Ditangani Periode Ini', value: `${periodLeads.length} Lead` },
+            { label: 'Rata-rata Kepatuhan SLA', value: '96.5%' },
+            { label: 'Status Integrasi Sistem', value: 'Google Account Synced' }
+          ]
+        },
+        filenamePrefix: 'Laporan_Produktivitas_Dan_SLA_Karyawan_NST'
+      };
+    }
+
+    if (activeReportTab === 'bukti_utilisasi') {
+      const headers = [
+        'ID Lead', 'Surat Jalan', 'Klien', 'Kode Isotank',
+        'Rute', 'Muatan', 'Info Kapal',
+        'Operator', 'Total Berkas', 'Bukti BASTP', 'Status Lead'
+      ];
+
+      const rows = periodLeads.map(l => {
+        const fileCount = evidences.filter(e => e.lead_id === l.id).length;
+        return [
+          l.lead_code || 'LEAD-00101',
+          l.no_surat_jalan,
+          l.client_company || 'PT Petrokimia Utama Indonesia',
+          l.asset_code,
+          `${l.asal} -> ${l.tujuan}`,
+          l.muatan,
+          l.is_inter_island ? `${l.shipping_company} (${l.vessel_name})` : 'Darat (Direct)',
+          l.pic_name,
+          `${fileCount} Berkas Terlampir`,
+          l.final_delivery_doc_name ? `TERVERIFIKASI (${l.final_delivery_doc_name})` : 'Belum Terlampir',
+          `Stage ${l.current_step}/8 (${l.status})`
+        ];
+      });
+
+      return {
+        metadata: {
+          title: 'Laporan Rekapitulasi Bukti Dokumen per ID Lead & Utilisasi Armada Isotank',
+          reportCode: 'NST/OPS-DOC/2026/X/0927',
+          periodText: periodRange.label,
+          generatedBy: currentUser.name,
+          generatedRole: currentUser.role,
+          generatedAt: timeNow,
+          totalRecords: periodLeads.length
+        },
+        tableData: {
+          headers,
+          rows,
+          summary: [
+            { label: 'Total Folder Lead', value: `${periodLeads.length} Folder` },
+            { label: 'Total Dokumen Terlampir', value: `${evidences.length} Berkas` },
+            { label: 'Unit Isotank Beroperasi', value: `${assets.filter(a => a.status === 'Beroperasi').length} Unit` },
+            { label: 'Utilisasi Armada Aktif', value: '73.3%' }
+          ]
+        },
+        filenamePrefix: 'Laporan_Rekap_Bukti_Dan_Utilisasi_NST'
+      };
+    }
+
+    // Default: audit_kontrol
+    const headers = [
+      'No Log', 'Waktu', 'Pengguna', 'Peran',
+      'Aksi', 'Entitas', 'Log Detail'
+    ];
+
+    const rows = periodAuditLogs.map(l => [
+      l.log_number,
+      l.timestamp,
+      l.user_name,
+      l.user_role.toUpperCase(),
+      l.action,
+      `${l.entity} #${l.entity_id}`,
+      l.details
+    ]);
+
+    return {
+      metadata: {
+        title: 'Laporan Kontrol Kualitas QA & Log Audit Trail Sistem Resmi',
+        reportCode: 'NST/OPS-AUD/2026/X/0319',
+        periodText: periodRange.label,
+        generatedBy: currentUser.name,
+        generatedRole: currentUser.role,
+        generatedAt: timeNow,
+        totalRecords: periodAuditLogs.length
+      },
+      tableData: {
+        headers,
+        rows,
+        summary: [
+          { label: 'Total Log Audit Sistem', value: `${periodAuditLogs.length} Entri` },
+          { label: 'Kendala Operasional Dilaporkan', value: `${periodIssues.length} Kasus` },
+          { label: 'Audit Trail Integrity', value: '100% Append-Only' },
+          { label: 'Standar Akreditasi', value: 'ISO 9001:2015 Compliant' }
+        ]
+      },
+      filenamePrefix: 'Laporan_Kontrol_Kualitas_Dan_Audit_Trail_NST'
+    };
+  }, [activeReportTab, periodLeads, periodAuditLogs, periodIssues, users, assets, evidences, periodRange, currentUser]);
+
+  // Export handlers
+  const handleDownloadExcel = () => {
+    downloadCorporateExcel(
+      currentExportPackage.metadata,
+      currentExportPackage.tableData,
+      currentExportPackage.filenamePrefix
+    );
+  };
+
+  const handleDownloadPDFDirect = () => {
+    downloadCorporatePDF(
+      currentExportPackage.metadata,
+      currentExportPackage.tableData,
+      currentExportPackage.filenamePrefix
+    );
+  };
+
+  const handleOpenPrintModal = () => {
+    setIsPrintModalOpen(true);
+  };
+
+  const handleExportCSV = () => {
     const csvContent =
       'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+      [
+        `PT NIAGA SEGARA TRASINDO - ${currentExportPackage.metadata.title}`,
+        `Periode: ${currentExportPackage.metadata.periodText}`,
+        `Waktu Penarikan Data: ${currentExportPackage.metadata.generatedAt}`,
+        `Dicetak Oleh: ${currentExportPackage.metadata.generatedBy} (${currentExportPackage.metadata.generatedRole})`,
+        '',
+        currentExportPackage.tableData.headers.join(','),
+        ...currentExportPackage.tableData.rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `${currentExportPackage.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const handleExportCurrent = () => {
-    const timestampStr = new Date().toISOString().slice(0, 10);
-
-    if (activeReportTab === 'eksekutif') {
-      const headers = ['ID Lead', 'No Surat Jalan', 'Kode Isotank', 'Asal', 'Tujuan', 'Muatan', 'Stage', 'Status SLA', 'Revisi'];
-      const rows = filteredLeads.map(l => [
-        l.lead_code || 'LEAD-00101', l.no_surat_jalan, l.asset_code, l.asal, l.tujuan, l.muatan, `Stage ${l.current_step}`, l.status === 'closed' ? 'CLOSED' : 'IN_PROGRESS', l.total_revisions
-      ]);
-      exportToCSV(`Laporan_Ringkasan_Eksekutif_${timestampStr}`, headers, rows);
-    } else if (activeReportTab === 'produktivitas_sla') {
-      const headers = ['Nama Karyawan', 'Peran System', 'Departemen', 'Lead Ditangani', 'Lead Selesai', 'Total Revisi', 'Tingkat SLA %', 'Status Google Sync'];
-      const rows = users.map(u => {
-        const handled = filteredLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).length;
-        const closed = filteredLeads.filter(l => (l.pic_id === u.id || l.creator_id === u.id) && l.status === 'closed').length;
-        const revs = filteredLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).reduce((a, b) => a + b.total_revisions, 0);
-        return [u.name, u.role.toUpperCase(), u.department, handled, closed, revs, '96.5%', u.googleLinked ? 'TERKONEKSI' : 'LOCAL'];
-      });
-      exportToCSV(`Laporan_Produktivitas_Dan_SLA_Karyawan_${timestampStr}`, headers, rows);
-    } else if (activeReportTab === 'bukti_utilisasi') {
-      const headers = ['ID Lead', 'No Surat Jalan', 'Kode Isotank', 'Rute Asal-Tujuan', 'Muatan Chemical', 'PIC Operator', 'Total Dokumen', 'Status Lead'];
-      const rows = filteredLeads.map(l => {
-        const fileCount = evidences.filter(e => e.lead_id === l.id).length;
-        return [l.lead_code || 'LEAD-00101', l.no_surat_jalan, l.asset_code, `${l.asal} -> ${l.tujuan}`, l.muatan, l.pic_name, `${fileCount} Berkas`, `Stage ${l.current_step}`];
-      });
-      exportToCSV(`Laporan_Rekap_Bukti_Dan_Utilisasi_${timestampStr}`, headers, rows);
-    } else if (activeReportTab === 'audit_kontrol') {
-      const headers = ['No Log System', 'Waktu Detik', 'Pengguna', 'Peran System', 'Aksi Transaksi', 'Entitas Target', 'Detail Transcript'];
-      const rows = auditLogs.map(l => [
-        l.log_number, l.timestamp, l.user_name, l.user_role.toUpperCase(), l.action, `${l.entity} #${l.entity_id}`, l.details
-      ]);
-      exportToCSV(`Laporan_Kontrol_Kualitas_Dan_Audit_Trail_${timestampStr}`, headers, rows);
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   const openEvidencePopup = (leadId: string) => {
@@ -83,7 +372,7 @@ export const ReportsView: React.FC = () => {
     {
       id: 'eksekutif',
       label: '1. Ringkasan Eksekutif & Health Score',
-      desc: 'KPI Konsolidasi, Performa Rute Utama, & Otorisasi Direksi'
+      desc: 'KPI Konsolidasi, Performa Rute, Mitra Truk & Kapal Laut'
     },
     {
       id: 'produktivitas_sla',
@@ -102,20 +391,6 @@ export const ReportsView: React.FC = () => {
     },
   ];
 
-  // Filtered Leads for Grouped Evidence Module
-  const displayedLeadDrive = filteredLeads.filter(l => {
-    if (!searchLeadQuery.trim()) return true;
-    const q = searchLeadQuery.toLowerCase();
-    return (
-      (l.lead_code || '').toLowerCase().includes(q) ||
-      l.no_surat_jalan.toLowerCase().includes(q) ||
-      l.asset_code.toLowerCase().includes(q) ||
-      l.asal.toLowerCase().includes(q) ||
-      l.tujuan.toLowerCase().includes(q) ||
-      l.pic_name.toLowerCase().includes(q)
-    );
-  });
-
   return (
     <div className="space-y-6">
       
@@ -133,26 +408,174 @@ export const ReportsView: React.FC = () => {
             <span>Pusat Laporan & Analytics Manajemen Terpadu</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Pemetaan data terstruktur dan ringkas berbasis modul eksekutif dengan dukungan popup drill-down dokumen resmi PT Niaga Segara Trasindo.
+            Pemetaan data terstruktur berbasis periode dengan dukungan unduh berkas resmi Excel (.xlsx) dan PDF Kop Surat PT Niaga Segara Trasindo.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        {/* Corporate Download & Print Buttons */}
+        <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+          {/* Popup Window Download Selector (Primary Feature) */}
           <button
-            onClick={handleExportCurrent}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center space-x-2 border border-slate-700 transition-colors shadow-md"
+            onClick={() => setIsDownloadPopupOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500/25 to-cyan-500/25 hover:from-teal-500/35 hover:to-cyan-500/35 text-teal-300 font-extrabold text-xs flex items-center space-x-2 border border-teal-500/50 shadow-md transition-all hover:scale-105 active:scale-95"
+            title="Buka Jendela Popup Pemilihan Laporan (Selesai vs Berjalan, Filter Bulan & Tahun)"
           >
             <Download className="w-4 h-4 text-teal-400" />
-            <span>Ekspor CSV File</span>
+            <span>Pusat Unduh Laporan (Popup)</span>
           </button>
+
+          {/* Direct Download PDF (.pdf) */}
           <button
-            onClick={handlePrint}
-            className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold text-xs flex items-center space-x-2 shadow-lg shadow-teal-500/20 transition-transform hover:scale-105"
+            onClick={handleDownloadPDFDirect}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-extrabold text-xs flex items-center space-x-2 shadow-lg shadow-rose-500/25 transition-all hover:scale-105 active:scale-95"
+            title="Unduh File Dokumen Resmi Adobe PDF (.pdf) Langsung ke Komputer"
           >
-            <Printer className="w-4 h-4" />
-            <span>Cetak PDF Laporan Resmi</span>
+            <FileText className="w-4 h-4 text-white" />
+            <span>Download PDF (.pdf)</span>
+          </button>
+
+          {/* Download Excel (.xlsx) */}
+          <button
+            onClick={handleDownloadExcel}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center space-x-2 shadow-md shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95"
+            title="Download Berkas Excel Resmi (.xlsx) dengan Kop Surat & Lembar Pengesahan"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Download Excel (.xlsx)</span>
+          </button>
+
+          {/* Cetak / Pratinjau Print */}
+          <button
+            onClick={handleOpenPrintModal}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center space-x-2 transition-all"
+            title="Buka Pratinjau Cetak / Dialog Printer Browser"
+          >
+            <Printer className="w-4 h-4 text-cyan-400" />
+            <span>Pratinjau Cetak</span>
+          </button>
+
+          {/* Quick CSV */}
+          <button
+            onClick={handleExportCSV}
+            className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center space-x-1.5 border border-slate-700 transition-colors shadow-sm"
+            title="Unduh Data Mentah CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-400" />
+            <span>CSV</span>
           </button>
         </div>
+      </div>
+
+      {/* FILTER PERIODE WAKTU LAPORAN (PERIOD SELECTOR TOOLBAR) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3 no-print">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center space-x-2 text-xs font-bold text-slate-200">
+            <Calendar className="w-4 h-4 text-teal-400" />
+            <span>Pilih Periode Waktu Data Laporan:</span>
+          </div>
+
+          <div className="px-3 py-1 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold flex items-center space-x-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+            <span>{periodRange.label} — <strong>{periodLeads.length} Lead Ditemukan</strong></span>
+          </div>
+        </div>
+
+        {/* Period Chips Selection */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setSelectedPeriod('month_this')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedPeriod === 'month_this'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Bulan Ini (Okt 2026)
+          </button>
+
+          <button
+            onClick={() => setSelectedPeriod('month_prev')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedPeriod === 'month_prev'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Bulan Lalu (Sep 2026)
+          </button>
+
+          <button
+            onClick={() => setSelectedPeriod('quarter_4')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedPeriod === 'quarter_4'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Kuartal IV (Q4 2026)
+          </button>
+
+          <button
+            onClick={() => setSelectedPeriod('year_2026')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedPeriod === 'year_2026'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Tahun Anggaran 2026
+          </button>
+
+          <button
+            onClick={() => setSelectedPeriod('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedPeriod === 'all'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Semua Periode ({filteredLeads.length})
+          </button>
+
+          <button
+            onClick={() => setSelectedPeriod('custom')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedPeriod === 'custom'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Kustom Rentang Tanggal...
+          </button>
+        </div>
+
+        {/* Custom Date Pickers (Visible when custom selected) */}
+        {selectedPeriod === 'custom' && (
+          <div className="pt-2 flex flex-wrap items-center gap-3 text-xs bg-slate-800/40 p-3 rounded-xl border border-slate-700/60 animate-in fade-in">
+            <span className="text-slate-400 font-semibold">Tentukan Rentang Tanggal:</span>
+            <div className="flex items-center space-x-2">
+              <label className="text-slate-300">Dari:</label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-slate-300">Sampai:</label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+            <span className="text-[11px] text-teal-400 font-medium">
+              *Data lead & berkas akan disaring secara otomatis berdasarkan rentang tanggal ini.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Sub-menu Tabs (Consolidated 4 Modules) */}
@@ -187,31 +610,37 @@ export const ReportsView: React.FC = () => {
         
         {/* Printable Official Letterhead Header */}
         <div className="border-b-2 border-slate-700 pb-5 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 text-slate-950 font-black flex items-center justify-center text-lg shadow-md font-mono">
-              NST
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-14 bg-slate-800 border border-slate-700 rounded-xl p-1 flex items-center justify-center shrink-0">
+              <img
+                src="/assets/aistudio/nistrans-logo__1__d944a664.svg"
+                alt="PT Niaga Segara Trasindo Logo"
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
             <div>
               <div className="text-xs font-bold text-teal-400 uppercase tracking-widest">PT NIAGA SEGARA TRASINDO</div>
-              <h2 className="text-lg font-black text-slate-100 uppercase tracking-tight mt-0.5">
-                {activeReportTab === 'eksekutif' && 'MODULE 1: RINGKASAN EKSEKUTIF & HEALTH SCORE OPERASIONAL'}
-                {activeReportTab === 'produktivitas_sla' && 'MODULE 2: KINERJA KARYAWAN & AUDIT SIKLUS WAKTU SLA'}
+              <h2 className="text-base sm:text-lg font-black text-slate-100 uppercase tracking-tight mt-0.5">
+                {activeReportTab === 'eksekutif' && 'MODULE 1: RINGKASAN EKSEKUTIF OPERASIONAL & KEMITRAAN MULTIMODA'}
+                {activeReportTab === 'produktivitas_sla' && 'MODULE 2: KINERJA KARYAWAN & AUDIT SIKLUS WAKTU SLA 8-TAHAP'}
                 {activeReportTab === 'bukti_utilisasi' && 'MODULE 3: REKAP BUKTI DOKUMEN (POPUP SUB-MENU) & UTILISASI ARMADA'}
                 {activeReportTab === 'audit_kontrol' && 'MODULE 4: KONTROL KUALITAS (QA) & AUDIT TRAIL SISTEM RESMI'}
               </h2>
-              <div className="text-[11px] text-slate-400 flex items-center space-x-3 mt-1">
-                <span>Tanggal Laporan: <strong>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong></span>
+              <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                <span>Periode: <strong className="text-teal-300">{periodRange.label}</strong></span>
                 <span>·</span>
                 <span>Standar Kepatuhan: <strong>ISO-9001 / HAZMAT SAFETY AUDIT</strong></span>
+                <span>·</span>
+                <span>NPWP: <strong>01.884.992.3-604.000</strong></span>
               </div>
             </div>
           </div>
 
           <div className="text-right text-xs font-mono text-slate-400 space-y-1">
             <div className="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-teal-300 font-bold inline-block">
-              REF NO: NST-EXEC-2026-V8
+              {currentExportPackage.metadata.reportCode}
             </div>
-            <div className="text-[10px] text-slate-500 uppercase">KLASIFIKASI: INTERNAL CONFIDENTIAL</div>
+            <div className="text-[10px] text-slate-500 uppercase">KLASIFIKASI: INTERNAL RESMI</div>
           </div>
         </div>
 
@@ -222,8 +651,8 @@ export const ReportsView: React.FC = () => {
             {/* KPI Cards Strip */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-center">
-                <span className="text-xs text-slate-400 font-semibold block">Total Volume Lead</span>
-                <strong className="text-2xl font-extrabold text-slate-100 font-mono mt-1 block">{filteredLeads.length} Lead</strong>
+                <span className="text-xs text-slate-400 font-semibold block">Total Volume Lead Periode Ini</span>
+                <strong className="text-2xl font-extrabold text-slate-100 font-mono mt-1 block">{periodLeads.length} Lead</strong>
                 <span className="text-[10px] text-teal-400 font-bold">100% Terverifikasi System</span>
               </div>
               <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-center">
@@ -232,9 +661,11 @@ export const ReportsView: React.FC = () => {
                 <span className="text-[10px] text-emerald-400 font-bold">Target Lolos &ge; 90%</span>
               </div>
               <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-center">
-                <span className="text-xs text-slate-400 font-semibold block">Rata Siklus Pengiriman</span>
-                <strong className="text-2xl font-extrabold text-cyan-300 font-mono mt-1 block">198 Jam</strong>
-                <span className="text-[10px] text-slate-400">Stage 1 s/d Stage 8</span>
+                <span className="text-xs text-slate-400 font-semibold block">Pengiriman Antar-Pulau (Laut)</span>
+                <strong className="text-2xl font-extrabold text-cyan-300 font-mono mt-1 block">
+                  {periodLeads.filter(l => l.is_inter_island).length} Lead
+                </strong>
+                <span className="text-[10px] text-cyan-300 font-bold">Mitra Kapal Kargo Ro-Ro</span>
               </div>
               <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-center">
                 <span className="text-xs text-slate-400 font-semibold block">Health Index Operasional</span>
@@ -250,49 +681,88 @@ export const ReportsView: React.FC = () => {
                 <span>Naratif Analisis Eksekutif & Kepatuhan Operasional</span>
               </h4>
               <p>
-                Berdasarkan konsolidasi data transaksi sistem IsoTrack, kinerja pengiriman bahan kimia cair dan gas industri PT Niaga Segara Trasindo pada periode ini mencatatkan efisiensi tinggi. Rute utama frekuensi tinggi seperti **Depo Utama Tuban - Petrokimia Gresik**, **Tanjung Perak - Terboyo Semarang**, dan **Depo Cilegon - Jababeka Cikarang** beroperasi secara optimal dengan utilisasi isotank mencapai **73.3%**.
-              </p>
-              <p>
-                Penerapan verifikasi checklist 4-butir di Stage 2 (Manager Approval) dan 3-butir di Stage 5 (Reviewer Verification) terbukti meminimalkan risiko kesalahan administrasi Surat Jalan stempel basah.
+                Berdasarkan data transaksi sistem IsoTrack untuk <strong>{periodRange.label}</strong>, pengiriman bahan kimia cair dan gas industri PT Niaga Segara Trasindo beroperasi dengan standar kepatuhan tinggi. Seluruh armada truk pengangkut mitra vendor (*PT Segara Logistik, PT Nusantara Trans, PT Samudra Jaya*) dan jasa kapal penyeberangan kargo antar-pulau (*Meratus Line, DLU, ASDP*) telah tervalidasi dokumen absah dan tiket penyeberangan sebelum unit bergerak.
               </p>
             </div>
 
-            {/* Main Routes Summary Table */}
+            {/* TABEL LENGKAP TRANSAKSI LEAD PERIODE INI */}
             <div className="space-y-3">
-              <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">Performa Rute Pengiriman Utama</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider flex items-center space-x-2">
+                  <Truck className="w-4 h-4 text-teal-400" />
+                  <span>Daftar Transaksi Lead Operasional Sesuai Data Periode Terpilih ({periodLeads.length} Lead)</span>
+                </h4>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-800 text-slate-400 uppercase text-[10px] border-b border-slate-700">
                     <tr>
-                      <th className="p-3">Rute Pengiriman</th>
-                      <th className="p-3">Spesifikasi Muatan</th>
-                      <th className="p-3">Total Volume</th>
-                      <th className="p-3">Durasi Rata-rata</th>
-                      <th className="p-3">SLA Status</th>
+                      <th className="p-3">ID Lead</th>
+                      <th className="p-3">No Surat Jalan</th>
+                      <th className="p-3">Klien Perusahaan</th>
+                      <th className="p-3">Mitra Truk & Supir</th>
+                      <th className="p-3">Pengangkutan Laut</th>
+                      <th className="p-3">Isotank & Muatan</th>
+                      <th className="p-3">Rute</th>
+                      <th className="p-3">Tahap</th>
+                      <th className="p-3">Status Ketibaan (BASTP)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                    <tr className="hover:bg-slate-800/40">
-                      <td className="p-3 font-bold text-slate-100">Tuban &rarr; Gresik</td>
-                      <td className="p-3">Caustic Soda Liquid 48%</td>
-                      <td className="p-3 font-mono">4 Lead</td>
-                      <td className="p-3 font-mono">36 Jam</td>
-                      <td className="p-3 font-bold text-emerald-400">100% On-Time</td>
-                    </tr>
-                    <tr className="hover:bg-slate-800/40">
-                      <td className="p-3 font-bold text-slate-100">Surabaya &rarr; Semarang</td>
-                      <td className="p-3">Methanol Grade A Industrial</td>
-                      <td className="p-3 font-mono">3 Lead</td>
-                      <td className="p-3 font-mono">48 Jam</td>
-                      <td className="p-3 font-bold text-emerald-400">100% On-Time</td>
-                    </tr>
-                    <tr className="hover:bg-slate-800/40">
-                      <td className="p-3 font-bold text-slate-100">Cilegon &rarr; Cikarang</td>
-                      <td className="p-3">LPG Industrial Mix</td>
-                      <td className="p-3 font-mono">3 Lead</td>
-                      <td className="p-3 font-mono">52 Jam</td>
-                      <td className="p-3 font-bold text-amber-400">92% On-Time</td>
-                    </tr>
+                    {periodLeads.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="p-6 text-center text-slate-500 italic">
+                          Tidak ada transaksi lead pada periode yang dipilih.
+                        </td>
+                      </tr>
+                    ) : (
+                      periodLeads.map((l) => (
+                        <tr key={l.id} className="hover:bg-slate-800/40">
+                          <td className="p-3 font-mono font-bold text-teal-300">
+                            {l.lead_code || 'LEAD-00101'}
+                          </td>
+                          <td className="p-3 font-mono font-bold text-slate-100">{l.no_surat_jalan}</td>
+                          <td className="p-3 text-slate-200 font-semibold">{l.client_company || 'PT Petrokimia'}</td>
+                          <td className="p-3">
+                            <div className="text-slate-100">{l.transport_vendor_name || 'PT Segara Logistik'}</div>
+                            <div className="text-[10px] text-slate-400">{l.nama_supir} ({l.no_plat_truk})</div>
+                          </td>
+                          <td className="p-3">
+                            {l.is_inter_island ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center space-x-1">
+                                <Ship className="w-3 h-3" />
+                                <span>{l.shipping_company}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">Rute Darat</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="font-mono text-teal-400 font-bold">{l.asset_code}</div>
+                            <div className="text-[10px] text-slate-400">{l.muatan}</div>
+                          </td>
+                          <td className="p-3 text-slate-300">{l.asal} &rarr; {l.tujuan}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-teal-300 border border-teal-500/20">
+                              Stage {l.current_step}/8
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {l.final_delivery_doc_name ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>BASTP Sah</span>
+                              </span>
+                            ) : l.status === 'closed' ? (
+                              <span className="text-emerald-400 font-bold text-[11px]">Selesai</span>
+                            ) : (
+                              <span className="text-amber-400 text-[11px]">Dalam Proses</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -379,39 +849,36 @@ export const ReportsView: React.FC = () => {
                 <thead className="bg-slate-800 text-slate-400 uppercase text-[10px] border-b border-slate-700">
                   <tr>
                     <th className="p-3">Nama Karyawan</th>
-                    <th className="p-3">Peran System</th>
+                    <th className="p-3">Peran Sistem</th>
                     <th className="p-3">Departemen</th>
-                    <th className="p-3">Lead Ditangani</th>
-                    <th className="p-3">Lead Selesai</th>
+                    <th className="p-3">Lead Ditangani (Periode Ini)</th>
+                    <th className="p-3">Lead Selesai (Closed)</th>
                     <th className="p-3">Total Revisi</th>
-                    <th className="p-3">SLA On-Time Rate</th>
-                    <th className="p-3">Status Google Sign-In</th>
+                    <th className="p-3">Kepatuhan SLA</th>
+                    <th className="p-3">Status Google Sync</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
                   {users.map((u) => {
-                    const handledCount = filteredLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).length;
-                    const closedCount = filteredLeads.filter(l => (l.pic_id === u.id || l.creator_id === u.id) && l.status === 'closed').length;
-                    const revsCount = filteredLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).reduce((a, b) => a + b.total_revisions, 0);
+                    const handled = periodLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).length;
+                    const closed = periodLeads.filter(l => (l.pic_id === u.id || l.creator_id === u.id) && l.status === 'closed').length;
+                    const revs = periodLeads.filter(l => l.pic_id === u.id || l.creator_id === u.id).reduce((a, b) => a + b.total_revisions, 0);
 
                     return (
                       <tr key={u.id} className="hover:bg-slate-800/40">
                         <td className="p-3 font-bold text-slate-100 flex items-center space-x-2">
-                          <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full border border-slate-700 object-cover" />
-                          <div>
-                            <div>{u.name}</div>
-                            <div className="text-[10px] text-slate-500 font-mono">{u.email}</div>
-                          </div>
+                          <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover" />
+                          <span>{u.name}</span>
                         </td>
-                        <td className="p-3 uppercase font-bold text-teal-400">{u.role}</td>
-                        <td className="p-3 text-slate-400">{u.department}</td>
-                        <td className="p-3 font-bold font-mono text-slate-100">{handledCount} Lead</td>
-                        <td className="p-3 font-bold font-mono text-emerald-400">{closedCount} Lead</td>
-                        <td className="p-3 font-mono text-amber-400">{revsCount} Kali</td>
-                        <td className="p-3 font-bold text-emerald-400">96.5%</td>
+                        <td className="p-3 uppercase text-[10px] font-bold text-teal-400">{u.role}</td>
+                        <td className="p-3 text-slate-300">{u.department}</td>
+                        <td className="p-3 font-mono font-bold text-slate-100">{handled} Lead</td>
+                        <td className="p-3 font-mono font-bold text-emerald-400">{closed} Lead</td>
+                        <td className="p-3 font-mono text-amber-400">{revs} Revisi</td>
+                        <td className="p-3 font-mono font-bold text-teal-300">96.5%</td>
                         <td className="p-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                            TERKONEKSI
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/10 text-teal-300 border border-teal-500/20">
+                            {u.googleLinked ? 'TERKONEKSI' : 'LOCAL'}
                           </span>
                         </td>
                       </tr>
@@ -432,9 +899,9 @@ export const ReportsView: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center space-x-2">
                 <FileText className="w-4 h-4 text-teal-400" />
-                <span className="text-slate-200 font-bold">Ringkasan Folder Bukti Per ID Lead:</span>
+                <span className="text-slate-200 font-bold">Ringkasan Folder Bukti Per ID Lead (Periode: {periodRange.label}):</span>
                 <span className="text-slate-400">
-                  Data dikelompokkan ringkas per ID Lead. Klik <strong className="text-teal-300">Popup Detail Berkas</strong> untuk memilih & melihat berkas lampiran per stage secara interaktif.
+                  Klik <strong className="text-teal-300">Popup Detail Berkas</strong> untuk membuka sub-menu berkas (Surat Jalan, Tiket Kapal, Foto, BASTP).
                 </span>
               </div>
 
@@ -444,7 +911,7 @@ export const ReportsView: React.FC = () => {
                   type="text"
                   value={searchLeadQuery}
                   onChange={(e) => setSearchLeadQuery(e.target.value)}
-                  placeholder="Cari ID Lead, SJ, Asset..."
+                  placeholder="Cari ID Lead, SJ, Vendor, Kapal..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
                 />
               </div>
@@ -457,54 +924,67 @@ export const ReportsView: React.FC = () => {
                   <tr>
                     <th className="p-3">ID Lead</th>
                     <th className="p-3">Surat Jalan & Isotank</th>
+                    <th className="p-3">Klien & Vendor Transport</th>
                     <th className="p-3">Rute & Muatan Chemical</th>
                     <th className="p-3">PIC Operator</th>
-                    <th className="p-3">Total Berkas Dokumen</th>
+                    <th className="p-3">Total Berkas</th>
                     <th className="p-3">Status Lead</th>
                     <th className="p-3 text-right">Aksi Sub-Menu Popup</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                  {displayedLeadDrive.map((leadItem) => {
-                    const leadFiles = evidences.filter(e => e.lead_id === leadItem.id);
-                    return (
-                      <tr key={leadItem.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 font-mono font-bold text-teal-300 text-xs">
-                          <span className="px-2 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/30">
-                            {leadItem.lead_code || 'LEAD-00101'}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <div className="font-bold text-slate-100 font-mono">{leadItem.no_surat_jalan}</div>
-                          <div className="text-[10px] text-teal-400 font-mono">Unit: {leadItem.asset_code}</div>
-                        </td>
-                        <td className="p-3">
-                          <div className="font-semibold text-slate-200">{leadItem.asal} &rarr; {leadItem.tujuan}</div>
-                          <div className="text-[10px] text-slate-400">{leadItem.muatan}</div>
-                        </td>
-                        <td className="p-3 text-slate-300">{leadItem.pic_name}</td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded font-mono font-bold bg-slate-800 text-slate-200 border border-slate-700">
-                            {leadFiles.length} Berkas Lampiran
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-teal-300 border border-teal-500/20">
-                            Stage {leadItem.current_step}/8
-                          </span>
-                        </td>
-                        <td className="p-3 text-right">
-                          <button
-                            onClick={() => openEvidencePopup(leadItem.id)}
-                            className="px-3 py-1.5 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs hover:bg-teal-400 flex items-center space-x-1 ml-auto shadow-sm"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Popup Detail Berkas</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {displayedLeadDrive.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-6 text-center text-slate-500 italic">
+                        Tidak ada berkas lead yang sesuai dengan pencarian atau periode terpilih.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedLeadDrive.map((leadItem) => {
+                      const leadFiles = evidences.filter(e => e.lead_id === leadItem.id);
+                      return (
+                        <tr key={leadItem.id} className="hover:bg-slate-800/40">
+                          <td className="p-3 font-mono font-bold text-teal-300 text-xs">
+                            <span className="px-2 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/30">
+                              {leadItem.lead_code || 'LEAD-00101'}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-100 font-mono">{leadItem.no_surat_jalan}</div>
+                            <div className="text-[10px] text-teal-400 font-mono">Unit: {leadItem.asset_code}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-slate-100 font-semibold">{leadItem.client_company || 'PT Petrokimia'}</div>
+                            <div className="text-[10px] text-slate-400">{leadItem.transport_vendor_name || 'PT Segara Logistik'}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-semibold text-slate-200">{leadItem.asal} &rarr; {leadItem.tujuan}</div>
+                            <div className="text-[10px] text-slate-400">{leadItem.muatan}</div>
+                          </td>
+                          <td className="p-3 text-slate-300">{leadItem.pic_name}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded font-mono font-bold bg-slate-800 text-slate-200 border border-slate-700">
+                              {leadFiles.length} Berkas
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 text-teal-300 border border-teal-500/20">
+                              Stage {leadItem.current_step}/8
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => openEvidencePopup(leadItem.id)}
+                              className="px-3 py-1.5 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs hover:bg-teal-400 flex items-center space-x-1 ml-auto shadow-sm"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Popup Detail Berkas</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -563,7 +1043,7 @@ export const ReportsView: React.FC = () => {
             {/* QA Issues Table */}
             <div className="space-y-3">
               <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
-                Catatan Kontrol Kualitas & Kendala Operasional Lapangan (QA)
+                Catatan Kontrol Kualitas & Kendala Operasional Lapangan (QA) ({periodIssues.length} Kendala)
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
@@ -579,23 +1059,31 @@ export const ReportsView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                    {issues.map((i) => (
-                      <tr key={i.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 font-mono font-bold text-slate-400">{i.id}</td>
-                        <td className="p-3 font-mono font-bold text-teal-400 text-[11px]">{i.lead_code || 'LEAD-00101'}</td>
-                        <td className="p-3 font-semibold text-slate-100">{i.deskripsi}</td>
-                        <td className="p-3">{i.pelapor_name} ({i.pelapor_role.toUpperCase()})</td>
-                        <td className="p-3 font-mono text-slate-400">{i.reported_at}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
-                            i.status === 'open' ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-slate-950'
-                          }`}>
-                            {i.status}
-                          </span>
+                    {periodIssues.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-500 italic">
+                          Tidak ada kendala operasional yang dilaporkan pada periode ini.
                         </td>
-                        <td className="p-3 text-slate-300">{i.resolution_notes || '-'}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      periodIssues.map((i) => (
+                        <tr key={i.id} className="hover:bg-slate-800/40">
+                          <td className="p-3 font-mono font-bold text-slate-400">{i.id}</td>
+                          <td className="p-3 font-mono font-bold text-teal-400 text-[11px]">{i.lead_code || 'LEAD-00101'}</td>
+                          <td className="p-3 font-semibold text-slate-100">{i.deskripsi}</td>
+                          <td className="p-3">{i.pelapor_name} ({i.pelapor_role.toUpperCase()})</td>
+                          <td className="p-3 font-mono text-slate-400">{i.reported_at}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
+                              i.status === 'open' ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-slate-950'
+                            }`}>
+                              {i.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-300">{i.resolution_notes || '-'}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -604,7 +1092,7 @@ export const ReportsView: React.FC = () => {
             {/* Audit Trail Log Transcript */}
             <div className="space-y-3 pt-4 border-t border-slate-800">
               <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
-                Jejak Audit Trail Sistem Resmi (Append-Only Log Transcript)
+                Jejak Audit Trail Sistem Resmi (Append-Only Log Transcript - {periodAuditLogs.length} Entri)
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
@@ -619,23 +1107,31 @@ export const ReportsView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                    {auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 font-mono font-bold text-teal-400">{log.log_number}</td>
-                        <td className="p-3 font-mono text-slate-400 text-[11px]">{log.timestamp}</td>
-                        <td className="p-3">
-                          <div className="font-semibold text-slate-100">{log.user_name}</div>
-                          <div className="text-[10px] text-slate-500 uppercase">{log.user_role}</div>
+                    {periodAuditLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-500 italic">
+                          Tidak ada log audit pada periode yang dipilih.
                         </td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700 font-mono">
-                            {log.action}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono text-[11px] text-slate-400">{log.entity} #{log.entity_id}</td>
-                        <td className="p-3 text-slate-300">{log.details}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      periodAuditLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-800/40">
+                          <td className="p-3 font-mono font-bold text-teal-400">{log.log_number}</td>
+                          <td className="p-3 font-mono text-slate-400 text-[11px]">{log.timestamp}</td>
+                          <td className="p-3">
+                            <div className="font-semibold text-slate-100">{log.user_name}</div>
+                            <div className="text-[10px] text-slate-500 uppercase">{log.user_role}</div>
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700 font-mono">
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-[11px] text-slate-400">{log.entity} #{log.entity_id}</td>
+                          <td className="p-3 text-slate-300">{log.details}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -651,6 +1147,24 @@ export const ReportsView: React.FC = () => {
         isOpen={isEvidencePopupOpen}
         onClose={() => setIsEvidencePopupOpen(false)}
         leadId={selectedLeadForPopup}
+      />
+
+      {/* Corporate PDF / Print Preview Modal */}
+      <CorporateReportPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        metadata={currentExportPackage.metadata}
+        tableData={currentExportPackage.tableData}
+        filenamePrefix={currentExportPackage.filenamePrefix}
+      />
+
+      {/* Central Report Download Selection Popup Modal */}
+      <ReportDownloadModal
+        isOpen={isDownloadPopupOpen}
+        onClose={() => setIsDownloadPopupOpen(false)}
+        initialType={downloadPopupType}
+        initialMonth={10}
+        initialYear={2026}
       />
 
     </div>

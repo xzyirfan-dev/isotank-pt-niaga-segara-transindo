@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   User, Asset, Lead, Evidence, Issue, Comment, AuditLog, ClosureArchive,
-  LeadStatus, Language, AccentColor, PeriodFilter, UserRole
+  LeadStatus, Language, AccentColor, PeriodFilter, UserRole,
+  InAppNotification, MasterDataConfig, TableDensity, LeadViewMode, DetailDisplayMode, SavedFilterPreset,
+  OperationalSubStageStatus, OperationalSubStageItem
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ASSETS, INITIAL_LEADS, INITIAL_EVIDENCES,
-  INITIAL_ISSUES, INITIAL_COMMENTS, INITIAL_AUDIT_LOGS, INITIAL_CLOSURES
+  INITIAL_ISSUES, INITIAL_COMMENTS, INITIAL_AUDIT_LOGS, INITIAL_CLOSURES,
+  INITIAL_NOTIFICATIONS, INITIAL_MASTER_DATA, INITIAL_SAVED_PRESETS
 } from '../data/mockData';
+import { isValidTransition } from '../utils/stateMachine';
+import { createDefaultOperationalSubStages } from '../utils/operationalStages';
 
 interface AppContextType {
   currentUser: User;
@@ -47,14 +52,77 @@ interface AppContextType {
   periodFilter: PeriodFilter;
   setPeriodFilter: React.Dispatch<React.SetStateAction<PeriodFilter>>;
 
+  // FASE 2: In-App Notifications
+  notifications: InAppNotification[];
+  unreadNotificationsCount: number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  addNotification: (notif: Omit<InAppNotification, 'id' | 'created_at' | 'read'>) => void;
+
+  // FASE 2: Master Data Management (Admin)
+  masterData: MasterDataConfig;
+  updateMasterData: <K extends keyof MasterDataConfig>(section: K, data: MasterDataConfig[K]) => void;
+
+  // FASE 2: UI Preferences & Density
+  tableDensity: TableDensity;
+  setTableDensity: (density: TableDensity) => void;
+  leadViewMode: LeadViewMode;
+  setLeadViewMode: (mode: LeadViewMode) => void;
+  detailDisplayMode: DetailDisplayMode;
+  setDetailDisplayMode: (mode: DetailDisplayMode) => void;
+
+  // FASE 2: Command Palette
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
+
+  // FASE 2: Saved Filter Presets
+  savedFilterPresets: SavedFilterPreset[];
+  activePresetFilterId: string | null;
+  applySavedPreset: (presetId: string | null) => void;
+
+  // FASE 2: System Logic & Duplicate Detection
+  checkDuplicateLead: (noSuratJalan: string, clientCompany?: string, assetCode?: string) => { isDuplicate: boolean; field: string; message: string; existingLead?: Lead };
+  bulkTransitionStage: (leadIds: string[], targetStage: LeadStatus, targetStep: number, notes?: string) => { successCount: number; message: string };
+  bulkAssignPic: (leadIds: string[], picId: string, picName: string) => void;
+  requestRevisionWithReason: (leadId: string, reason: string) => void;
+
   // Actions
   createNewLead: (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at' | 'status' | 'current_step' | 'total_revisions' | 'progress_percentage'>) => { success: boolean; message: string; leadId?: string };
+  updateLeadVesselBooking: (
+    leadId: string,
+    vesselData: {
+      is_inter_island: boolean;
+      shipping_company?: string;
+      vessel_name?: string;
+      voyage_number?: string;
+      vessel_schedule?: string;
+      port_origin?: string;
+      port_destination?: string;
+      vessel_ticket_doc_name?: string;
+      vessel_ticket_doc_url?: string;
+    }
+  ) => void;
+  updateLeadFinalDelivery: (
+    leadId: string,
+    deliveryData: {
+      final_delivery_doc_name: string;
+      final_delivery_received_by: string;
+      final_delivery_date: string;
+      final_delivery_doc_url?: string;
+    }
+  ) => void;
   transitionLeadStage: (
     leadId: string,
     targetStage: LeadStatus,
     targetStep: number,
     comment?: string,
     checklistCleared?: boolean
+  ) => { success: boolean; message: string };
+  updateOperationalSubStage: (
+    leadId: string,
+    subStageId: string,
+    newStatus: OperationalSubStageStatus,
+    internalNotes?: string
   ) => { success: boolean; message: string };
   addEvidence: (
     leadId: string,
@@ -72,8 +140,22 @@ interface AppContextType {
   updateAssetStatus: (assetId: string, status: Asset['status']) => void;
   resetDemoData: () => void;
 
+  // Toast Feedback & Undo System (Apple Web Interface Guidelines)
+  toast: ToastNotification | null;
+  showToast: (toastData: Omit<ToastNotification, 'id'>) => void;
+  clearToast: () => void;
+
   // Filtered Leads helper
   filteredLeads: Lead[];
+}
+
+export interface ToastNotification {
+  id: string;
+  type: 'status' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  undoAction?: () => void;
+  duration?: number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -96,6 +178,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           comments: parsed.comments || INITIAL_COMMENTS,
           auditLogs: parsed.auditLogs || INITIAL_AUDIT_LOGS,
           closures: parsed.closures || INITIAL_CLOSURES,
+          notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
+          masterData: parsed.masterData || INITIAL_MASTER_DATA,
+          tableDensity: (parsed.tableDensity as TableDensity) || 'comfortable',
+          leadViewMode: (parsed.leadViewMode as LeadViewMode) || 'table',
+          detailDisplayMode: (parsed.detailDisplayMode as DetailDisplayMode) || 'drawer',
+          savedFilterPresets: parsed.savedFilterPresets || INITIAL_SAVED_PRESETS,
         };
       }
     } catch (e) {
@@ -110,6 +198,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       comments: INITIAL_COMMENTS,
       auditLogs: INITIAL_AUDIT_LOGS,
       closures: INITIAL_CLOSURES,
+      notifications: INITIAL_NOTIFICATIONS,
+      masterData: INITIAL_MASTER_DATA,
+      tableDensity: 'comfortable' as TableDensity,
+      leadViewMode: 'table' as LeadViewMode,
+      detailDisplayMode: 'drawer' as DetailDisplayMode,
+      savedFilterPresets: INITIAL_SAVED_PRESETS,
     };
   };
 
@@ -135,6 +229,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialData.auditLogs);
   const [closures, setClosures] = useState<ClosureArchive[]>(initialData.closures);
 
+  // FASE 2: In-App Notifications
+  const [notifications, setNotifications] = useState<InAppNotification[]>(initialData.notifications);
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const addNotification = (notifData: Omit<InAppNotification, 'id' | 'created_at' | 'read'>) => {
+    const newNotif: InAppNotification = {
+      ...notifData,
+      id: `notif-${Date.now()}`,
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  // FASE 2: Master Data Management (Admin)
+  const [masterData, setMasterData] = useState<MasterDataConfig>(initialData.masterData);
+
+  const updateMasterData = <K extends keyof MasterDataConfig>(section: K, data: MasterDataConfig[K]) => {
+    setMasterData(prev => ({ ...prev, [section]: data }));
+    appendAuditLog(
+      'UPDATE_MASTER_DATA',
+      'Settings',
+      section,
+      `Admin memperbarui master data konfigurasi operasional pada bagian [${section}].`
+    );
+    showToast({
+      type: 'success',
+      title: 'Master Data Tersimpan',
+      message: `Konfigurasi ${section} berhasil diperbarui tanpa reload kode.`
+    });
+  };
+
+  // FASE 2: UI Preferences & Density
+  const [tableDensity, setTableDensity] = useState<TableDensity>(initialData.tableDensity);
+  const [leadViewMode, setLeadViewMode] = useState<LeadViewMode>(initialData.leadViewMode);
+  const [detailDisplayMode, setDetailDisplayMode] = useState<DetailDisplayMode>(initialData.detailDisplayMode);
+
+  // FASE 2: Command Palette
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+
+  // FASE 2: Saved Filter Presets
+  const [savedFilterPresets] = useState<SavedFilterPreset[]>(initialData.savedFilterPresets);
+  const [activePresetFilterId, setActivePresetFilterId] = useState<string | null>(null);
+
+  const applySavedPreset = (presetId: string | null) => {
+    setActivePresetFilterId(presetId);
+  };
+
   const [language, setLanguage] = useState<Language>('id');
   const [accentColor, setAccentColor] = useState<AccentColor>('teal');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
@@ -145,17 +295,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     endDate: '',
   });
 
+  // Apple-grade Toast System with Undo Capability
+  const [toast, setToast] = useState<ToastNotification | null>(null);
+
+  const showToast = (toastData: Omit<ToastNotification, 'id'>) => {
+    const id = `toast-${Date.now()}`;
+    const newToast: ToastNotification = { ...toastData, id };
+    setToast(newToast);
+
+    // Auto dismiss after duration unless it has an undo action (give undo 7 seconds)
+    const timeoutMs = toastData.undoAction ? (toastData.duration || 7000) : (toastData.duration || 4000);
+    setTimeout(() => {
+      setToast(current => (current?.id === id ? null : current));
+    }, timeoutMs);
+  };
+
+  const clearToast = () => setToast(null);
+
   // Save to localStorage when main state changes
   useEffect(() => {
     try {
       localStorage.setItem(
         LOCAL_STORAGE_KEY,
-        JSON.stringify({ users, leads, assets, evidences, issues, comments, auditLogs, closures })
+        JSON.stringify({
+          users,
+          leads,
+          assets,
+          evidences,
+          issues,
+          comments,
+          auditLogs,
+          closures,
+          notifications,
+          masterData,
+          tableDensity,
+          leadViewMode,
+          detailDisplayMode,
+          savedFilterPresets
+        })
       );
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
     }
-  }, [users, leads, assets, evidences, issues, comments, auditLogs, closures]);
+  }, [users, leads, assets, evidences, issues, comments, auditLogs, closures, notifications, masterData, tableDensity, leadViewMode, detailDisplayMode, savedFilterPresets]);
 
   // Sync html class for dark/light theme
   useEffect(() => {
@@ -321,9 +503,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLeads(prev => [newLead, ...prev]);
     setAssets(prev => prev.map(a => a.id === leadData.asset_id ? { ...a, status: 'Beroperasi' } : a));
 
-    appendAuditLog('CREATE_LEAD', 'Lead', newLeadId, `Membuat Lead Pengiriman Baru [${generatedLeadCode}] #${newLead.no_surat_jalan} (Aset: ${newLead.asset_code}, Rute: ${newLead.asal} -> ${newLead.tujuan}).`);
+    appendAuditLog('CREATE_LEAD', 'Lead', newLeadId, `Membuat Lead Pengiriman Baru [${generatedLeadCode}] #${newLead.no_surat_jalan} (Aset: ${newLead.asset_code}, Rute: ${newLead.asal} -> ${newLead.tujuan})${newLead.is_inter_island ? ' [RUTE ANTAR-PULAU: ' + (newLead.shipping_company || 'Kapal Kargo') + ']' : ''}.`);
 
     return { success: true, message: `Lead [${generatedLeadCode}] #${newLead.no_surat_jalan} berhasil dibuat!`, leadId: newLeadId };
+  };
+
+  // Update Inter-Island Vessel Booking Info
+  const updateLeadVesselBooking = (
+    leadId: string,
+    vesselData: {
+      is_inter_island: boolean;
+      shipping_company?: string;
+      vessel_name?: string;
+      voyage_number?: string;
+      vessel_schedule?: string;
+      port_origin?: string;
+      port_destination?: string;
+      vessel_ticket_doc_name?: string;
+      vessel_ticket_doc_url?: string;
+    }
+  ) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? {
+      ...l,
+      ...vesselData,
+      updated_at: new Date().toISOString()
+    } : l));
+
+    const target = leads.find(l => l.id === leadId);
+    appendAuditLog(
+      'UPDATE_VESSEL_BOOKING',
+      'Lead',
+      leadId,
+      `[ID Lead: ${target?.lead_code || leadId}] Memperbarui data pemesanan kapal kargo: ${vesselData.shipping_company || 'Kapal Kargo'} (${vesselData.vessel_name || '-'}, Voyage: ${vesselData.voyage_number || '-'}).`
+    );
+  };
+
+  // Update Final Delivery Proof (Syarat Penutupan Lead)
+  const updateLeadFinalDelivery = (
+    leadId: string,
+    deliveryData: {
+      final_delivery_doc_name: string;
+      final_delivery_received_by: string;
+      final_delivery_date: string;
+      final_delivery_doc_url?: string;
+    }
+  ) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? {
+      ...l,
+      ...deliveryData,
+      updated_at: new Date().toISOString()
+    } : l));
+
+    const target = leads.find(l => l.id === leadId);
+    appendAuditLog(
+      'UPLOAD_FINAL_DELIVERY_PROOF',
+      'Lead',
+      leadId,
+      `[ID Lead: ${target?.lead_code || leadId}] Melampirkan bukti dokumen/foto ketibaan di tujuan akhir (${deliveryData.final_delivery_doc_name}) diterima oleh ${deliveryData.final_delivery_received_by}.`
+    );
   };
 
   // Transition Lead through 8 Stages
@@ -336,6 +573,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) return { success: false, message: 'Lead tidak ditemukan.' };
+
+    if (!isValidTransition(lead.status, targetStage)) {
+      return {
+        success: false,
+        message: `Transisi tidak valid dari tahap ${lead.status} ke ${targetStage} ditolak oleh state machine sistem.`
+      };
+    }
 
     if (targetStage === 'submission' || targetStage === 'review') {
       const stageEvidences = evidences.filter(e => e.lead_id === leadId);
@@ -353,6 +597,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return {
           success: false,
           message: `Gagal menyetujui: Masih terdapat ${openIssues.length} kendala terbuka (Open Issues). Semua kendala wajib diselesaikan terlebih dahulu!`
+        };
+      }
+    }
+
+    // MANDATORY PROOF OF FINAL ARRIVAL FOR CLOSURE (Stage 8)
+    if (targetStage === 'closed') {
+      const hasFinalDeliveryProof = Boolean(lead.final_delivery_doc_name) ||
+        evidences.some(e => e.lead_id === leadId && (e.file_type === 'bukti_sampai_tujuan' || e.file_type === 'surat_jalan'));
+      if (!hasFinalDeliveryProof) {
+        return {
+          success: false,
+          message: 'Gagal menutup lead: Bukti berupa dokumen atau foto bahwa pengiriman telah sampai tujuan akhir (Proof of Delivery / BASTP) wajib dilampirkan sebelum lead dapat diselesaikan!'
         };
       }
     }
@@ -415,7 +671,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Mengubah status Lead [${lead.lead_code}] #${lead.no_surat_jalan} dari Stage ${lead.current_step} ke Stage ${targetStep} (${targetStage.toUpperCase()}).`
     );
 
+    // Apple Toast with Undo Action
+    const previousLeadState = { ...lead };
+    showToast({
+      type: 'success',
+      title: `Tahap Berhasil Diperbarui: Stage ${targetStep}`,
+      message: `Lead ${lead.lead_code} (${lead.no_surat_jalan}) berhasil dipindahkan ke tahap ${targetStage.replace('_', ' ').toUpperCase()}.`,
+      undoAction: () => {
+        setLeads(prev => prev.map(l => l.id === leadId ? previousLeadState : l));
+        appendAuditLog(
+          'UNDO_STAGE_TRANSITION',
+          'Lead',
+          leadId,
+          `[ID Lead: ${lead.lead_code}] Pengguna membatalkan (Undo) perubahan tahap kembali ke Stage ${previousLeadState.current_step} (${previousLeadState.status}).`
+        );
+        showToast({
+          type: 'status',
+          title: 'Perubahan Dibatalkan (Undo)',
+          message: `Lead ${lead.lead_code} dikembalikan ke Stage ${previousLeadState.current_step}.`
+        });
+      }
+    });
+
     return { success: true, message: `Status Lead [${lead.lead_code}] #${lead.no_surat_jalan} berhasil diperbarui ke Stage ${targetStep}.` };
+  };
+
+  const updateOperationalSubStage = (
+    leadId: string,
+    subStageId: string,
+    newStatus: OperationalSubStageStatus,
+    internalNotes?: string
+  ) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return { success: false, message: 'Lead tidak ditemukan.' };
+
+    const currentSubStages = lead.operationalSubStages || createDefaultOperationalSubStages();
+    
+    // Sequential consistency check: cannot complete sub-stage N unless N-1 is complete
+    const targetIdx = currentSubStages.findIndex(s => s.id === subStageId);
+    if (targetIdx > 0 && newStatus === 'selesai') {
+      const prevSubStage = currentSubStages[targetIdx - 1];
+      if (prevSubStage.status !== 'selesai' && currentUser.role !== 'admin') {
+        return {
+          success: false,
+          message: `Aturan Konsistensi Lapangan: Sub-tahap "${currentSubStages[targetIdx].title}" tidak dapat diselesaikan sebelum sub-tahap sebelumnya ("${prevSubStage.title}") selesai!`
+        };
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedSubStages = currentSubStages.map(s => {
+      if (s.id === subStageId) {
+        return {
+          ...s,
+          status: newStatus,
+          startTime: newStatus === 'berjalan' && !s.startTime ? nowIso : s.startTime,
+          endTime: newStatus === 'selesai' ? nowIso : s.endTime,
+          internalNotes: internalNotes !== undefined ? internalNotes : s.internalNotes,
+        };
+      }
+      return s;
+    });
+
+    const updatedLead: Lead = {
+      ...lead,
+      operationalSubStages: updatedSubStages,
+      updated_at: nowIso,
+    };
+
+    setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
+
+    appendAuditLog(
+      'UPDATE_OPERATIONAL_SUBSTAGE',
+      'Lead',
+      leadId,
+      `Memperbarui sub-tahap operasional lapangan ID ${subStageId} menjadi status: ${newStatus.toUpperCase()}`
+    );
+
+    showToast({
+      type: 'success',
+      title: 'Sub-tahap Operasional Diperbarui',
+      message: `Status sub-tahap berhasil diubah menjadi ${newStatus.toUpperCase()}`
+    });
+
+    return { success: true, message: 'Status sub-tahap operasional berhasil diperbarui.' };
   };
 
   const addEvidence = (
@@ -522,7 +861,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const filteredLeads = leads.filter(lead => {
     if (periodFilter.preset === 'all') return true;
-    const leadTime = new Date(lead.created_at).getTime();
+
+    // Use completed_at for closed leads if available, otherwise created_at
+    const dateStr = (lead.status === 'closed' && lead.completed_at) ? lead.completed_at : lead.created_at;
+    const leadDate = new Date(dateStr);
+    const leadTime = leadDate.getTime();
     const now = new Date().getTime();
 
     if (periodFilter.preset === '30d') {
@@ -533,13 +876,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const limit = now - (90 * 24 * 60 * 60 * 1000);
       return leadTime >= limit;
     }
+    if (periodFilter.preset === 'month_this') {
+      // October 2026 (based on system demo year 2026)
+      return leadDate.getMonth() === 9 && leadDate.getFullYear() === 2026;
+    }
+    if (periodFilter.preset === 'month_prev') {
+      // September 2026
+      return leadDate.getMonth() === 8 && leadDate.getFullYear() === 2026;
+    }
+    if (periodFilter.preset === 'quarter_4') {
+      // Q4 (Oct, Nov, Dec 2026)
+      const month = leadDate.getMonth();
+      return (month >= 9 && month <= 11) && leadDate.getFullYear() === 2026;
+    }
+    if (periodFilter.preset === 'year_2026') {
+      return leadDate.getFullYear() === 2026;
+    }
+    if (periodFilter.preset === 'month_year' && periodFilter.selectedMonth && periodFilter.selectedYear) {
+      return (leadDate.getMonth() + 1) === periodFilter.selectedMonth && leadDate.getFullYear() === periodFilter.selectedYear;
+    }
     if (periodFilter.preset === 'custom' && periodFilter.startDate && periodFilter.endDate) {
       const start = new Date(periodFilter.startDate).getTime();
-      const end = new Date(periodFilter.endDate).getTime() + (24 * 60 * 60 * 1000);
+      const end = new Date(periodFilter.endDate).getTime() + (24 * 60 * 60 * 1000 - 1);
       return leadTime >= start && leadTime <= end;
     }
     return true;
   });
+
+  // FASE 2: Duplicate Lead Detection
+  const checkDuplicateLead = (noSuratJalan: string, clientCompany?: string, assetCode?: string) => {
+    const cleanSJ = noSuratJalan.trim().toLowerCase();
+    if (!cleanSJ) return { isDuplicate: false, field: '', message: '' };
+
+    const existingBySJ = leads.find(l => l.no_surat_jalan.trim().toLowerCase() === cleanSJ);
+    if (existingBySJ) {
+      return {
+        isDuplicate: true,
+        field: 'no_surat_jalan',
+        message: `Nomor Surat Jalan "${noSuratJalan}" sudah terdaftar pada Lead [${existingBySJ.lead_code}] dengan status ${existingBySJ.status.toUpperCase()}.`,
+        existingLead: existingBySJ,
+      };
+    }
+
+    if (assetCode && clientCompany) {
+      const activeSameAsset = leads.find(
+        l => l.status !== 'closed' &&
+             l.asset_code.toLowerCase() === assetCode.toLowerCase() &&
+             l.client_company?.toLowerCase() === clientCompany.toLowerCase()
+      );
+      if (activeSameAsset) {
+        return {
+          isDuplicate: true,
+          field: 'asset_and_client',
+          message: `Peringatan: Unit Isotank ${assetCode} saat ini masih aktif beroperasi untuk klien "${clientCompany}" pada Lead [${activeSameAsset.lead_code}].`,
+          existingLead: activeSameAsset,
+        };
+      }
+    }
+
+    return { isDuplicate: false, field: '', message: '' };
+  };
+
+  // FASE 2: Bulk Stage Transitions
+  const bulkTransitionStage = (leadIds: string[], targetStage: LeadStatus, targetStep: number, notes?: string) => {
+    let successCount = 0;
+    leadIds.forEach(id => {
+      const res = transitionLeadStage(id, targetStage, targetStep, notes);
+      if (res.success) successCount++;
+    });
+    showToast({
+      type: 'success',
+      title: 'Aksi Massal Selesai',
+      message: `${successCount} dari ${leadIds.length} lead berhasil diperbarui ke Stage ${targetStep}.`
+    });
+    return { successCount, message: `${successCount} lead diproses` };
+  };
+
+  // FASE 2: Bulk PIC Assignment
+  const bulkAssignPic = (leadIds: string[], picId: string, picName: string) => {
+    setLeads(prev => prev.map(l => leadIds.includes(l.id) ? { ...l, pic_id: picId, pic_name: picName, updated_at: new Date().toISOString() } : l));
+    appendAuditLog(
+      'BULK_ASSIGN_PIC',
+      'Lead',
+      leadIds.join(', '),
+      `Penugasan massal PIC ke "${picName}" untuk ${leadIds.length} transaksi lead.`
+    );
+    showToast({
+      type: 'success',
+      title: 'PIC Berhasil Ditugaskan',
+      message: `${leadIds.length} lead kini dialokasikan ke ${picName}.`
+    });
+  };
+
+  // FASE 2: Mandatory Revision Reason
+  const requestRevisionWithReason = (leadId: string, reason: string) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+
+    transitionLeadStage(leadId, 'follow_up', 6, `Alasan Revisi / Penolakan Wajib: ${reason}`);
+    addNotification({
+      title: `Permintaan Revisi: ${lead.lead_code}`,
+      message: `Reviewer/Manager meminta revisi dokumen/operasional: "${reason}". Harap tangani pada Tahap 6.`,
+      type: 'revision',
+      lead_id: lead.id,
+      lead_code: lead.lead_code,
+      no_surat_jalan: lead.no_surat_jalan,
+    });
+  };
 
   return (
     <AppContext.Provider
@@ -576,7 +1019,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         periodFilter,
         setPeriodFilter,
         createNewLead,
+        updateLeadVesselBooking,
+        updateLeadFinalDelivery,
         transitionLeadStage,
+        updateOperationalSubStage,
         addEvidence,
         addIssue,
         resolveIssue,
@@ -584,6 +1030,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAssetStatus,
         resetDemoData,
         filteredLeads,
+        toast,
+        showToast,
+        clearToast,
+
+        // FASE 2 Values
+        notifications,
+        unreadNotificationsCount,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        addNotification,
+        masterData,
+        updateMasterData,
+        tableDensity,
+        setTableDensity,
+        leadViewMode,
+        setLeadViewMode,
+        detailDisplayMode,
+        setDetailDisplayMode,
+        isCommandPaletteOpen,
+        setIsCommandPaletteOpen,
+        savedFilterPresets,
+        activePresetFilterId,
+        applySavedPreset,
+        checkDuplicateLead,
+        bulkTransitionStage,
+        bulkAssignPic,
+        requestRevisionWithReason,
       }}
     >
       {children}

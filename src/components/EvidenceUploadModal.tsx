@@ -136,8 +136,10 @@ export const EvidenceUploadModal: React.FC<EvidenceUploadModalProps> = ({
             >
               <option value="surat_jalan">Surat Jalan Resmi (Stempel Basah)</option>
               <option value="dokumen_transporter">Dokumen Absah Kemitraan Transport / STNK / SIM</option>
+              <option value="tiket_kapal">Form Pemesanan / Tiket Kapal Kargo (Antar-Pulau)</option>
               <option value="foto_muatan">Foto Muatan & Segel Isotank</option>
               <option value="foto_bongkar">Foto Proses Pemuatan / Pembongkaran</option>
+              <option value="bukti_sampai_tujuan">Dokumen / Foto Bukti Sampai Tujuan (BASTP / POD)</option>
               <option value="laporan_kerja">Laporan Kerja Berita Acara (BA)</option>
               <option value="dokumen_lain">Dokumen Pendukung Lainnya</option>
             </select>

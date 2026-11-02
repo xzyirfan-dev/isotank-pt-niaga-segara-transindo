@@ -175,8 +175,11 @@ export const LeadEvidencePopupModal: React.FC<LeadEvidencePopupModalProps> = ({
               >
                 <option value="all">Semua Jenis Dokumen</option>
                 <option value="surat_jalan">Surat Jalan (Stempel)</option>
+                <option value="dokumen_transporter">Dokumen Absah Transporter</option>
+                <option value="tiket_kapal">Tiket / Booking Kapal Kargo</option>
                 <option value="foto_muatan">Foto Muatan & Segel</option>
                 <option value="foto_bongkar">Foto Pembongkaran</option>
+                <option value="bukti_sampai_tujuan">Dokumen / Foto Sampai Tujuan (BASTP)</option>
                 <option value="laporan_kerja">Berita Acara (BA)</option>
                 <option value="dokumen_lain">Dokumen Pendukung</option>
               </select>

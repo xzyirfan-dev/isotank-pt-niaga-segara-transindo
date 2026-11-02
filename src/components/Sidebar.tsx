@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import {
   LayoutDashboard, CheckSquare, Truck, PlusCircle, BarChart3,
   Sparkles, FileText, Settings, Users, ShieldCheck, Database, RefreshCw
@@ -22,17 +23,54 @@ export const Sidebar: React.FC = () => {
     return lead.status !== 'closed';
   }).length;
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dasbor Utama', icon: LayoutDashboard },
-    { id: 'my_tasks', label: 'Tugas Saya', icon: CheckSquare, badge: myPendingTasksCount },
-    { id: 'leads', label: 'Transaksi Lead', icon: Truck },
-    { id: 'new_lead', label: 'Buat Lead Baru', icon: PlusCircle },
-    { id: 'employee_control', label: 'Pengaturan Karyawan', icon: Users },
-    { id: 'reports', label: 'Laporan & Analytics', icon: BarChart3 },
-    { id: 'ai_recommendations', label: 'Rekomendasi AI', icon: Sparkles, highlight: true },
-    { id: 'system_log', label: 'Log Sistem (Audit)', icon: FileText },
-    { id: 'admin', label: 'Kelola Admin & Aset', icon: Settings },
-  ];
+  const navItems = React.useMemo(() => {
+    switch (currentUser.role) {
+      case 'karyawan':
+        return [
+          { id: 'dashboard', label: 'Dasbor Lead Saya', icon: LayoutDashboard },
+          { id: 'my_tasks', label: 'Tugas & Revisi PIC', icon: CheckSquare, badge: myPendingTasksCount },
+          { id: 'leads', label: 'Transaksi Lead', icon: Truck },
+          { id: 'new_lead', label: 'Buat Lead Baru', icon: PlusCircle },
+          { id: 'reports', label: 'Laporan & Pencapaian', icon: BarChart3 },
+          { id: 'ai_recommendations', label: 'Rekomendasi Alur', icon: Sparkles, highlight: true },
+        ];
+      case 'manager':
+        return [
+          { id: 'dashboard', label: 'Dasbor Otorisasi', icon: LayoutDashboard },
+          { id: 'my_tasks', label: 'Antrean Approval', icon: CheckSquare, badge: myPendingTasksCount },
+          { id: 'leads', label: 'Transaksi Lead', icon: Truck },
+          { id: 'reports', label: 'Evaluasi KPI Tim', icon: BarChart3 },
+          { id: 'ai_recommendations', label: 'Rekomendasi Bottleneck', icon: Sparkles, highlight: true },
+          { id: 'system_log', label: 'Audit Trail Sistem', icon: FileText },
+        ];
+      case 'reviewer':
+        return [
+          { id: 'dashboard', label: 'Dasbor Verifikasi', icon: LayoutDashboard },
+          { id: 'my_tasks', label: 'Antrean Review & BASTP', icon: CheckSquare, badge: myPendingTasksCount },
+          { id: 'leads', label: 'Transaksi Lead', icon: Truck },
+          { id: 'reports', label: 'Laporan Kepatuhan', icon: BarChart3 },
+          { id: 'system_log', label: 'Audit Berkas & Segel', icon: FileText },
+        ];
+      case 'operasional':
+        return [
+          { id: 'dashboard', label: 'Dasbor Operasional & Depo', icon: LayoutDashboard },
+          { id: 'leads', label: 'Transaksi Lead', icon: Truck },
+          { id: 'new_lead', label: 'Buat Lead Baru', icon: PlusCircle },
+          { id: 'reports', label: 'Laporan Armada', icon: BarChart3 },
+          { id: 'system_log', label: 'Log Aset & Depo', icon: FileText },
+        ];
+      case 'admin':
+      default:
+        return [
+          { id: 'dashboard', label: 'Dasbor Ringkasan Sistem', icon: LayoutDashboard },
+          { id: 'leads', label: 'Transaksi Lead', icon: Truck },
+          { id: 'admin', label: 'Pengaturan & Master Data', icon: Settings },
+          { id: 'system_log', label: 'Log Sistem (Audit)', icon: FileText },
+          { id: 'reports', label: 'Laporan & Analytics', icon: BarChart3 },
+          { id: 'ai_recommendations', label: 'Rekomendasi Cerdas', icon: Sparkles, highlight: true },
+        ];
+    }
+  }, [currentUser.role, myPendingTasksCount]);
 
   return (
     <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0">

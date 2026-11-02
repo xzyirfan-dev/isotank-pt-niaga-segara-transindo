@@ -99,7 +99,7 @@ export const AiRecommendationsView: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {insights.bottlenecks.map((btn, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-start space-x-2">
+                <div key={`btn-${idx}`} className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-start space-x-2">
                   <span className="w-5 h-5 rounded-full bg-rose-500 text-white font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
                     {idx + 1}
                   </span>
@@ -116,8 +116,8 @@ export const AiRecommendationsView: React.FC = () => {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {insights.recommendations.map((rec, idx) => (
-                <div key={idx} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-teal-500/50 transition-all shadow-md space-y-3 flex flex-col justify-between">
+              {insights.recommendations.map((rec) => (
+                <div key={rec.title} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-teal-500/50 transition-all shadow-md space-y-3 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${

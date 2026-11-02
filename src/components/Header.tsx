@@ -26,11 +26,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
     setThemeMode,
     leads,
     setActiveView,
+    setSelectedLeadId,
+    setIsCommandPaletteOpen,
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
   } = useApp();
 
   const [currentTime, setCurrentTime] = useState<string>('');
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const [showNotificationPopover, setShowNotificationPopover] = useState(false);
 
   // Live real-time clock with seconds
   useEffect(() => {
@@ -72,6 +79,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
     karyawan: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
     manager: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
     reviewer: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    operasional: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
     admin: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
   };
 
@@ -83,8 +91,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 transition-colors">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+    <header className="sticky top-0 z-40 apple-header border-b border-slate-800/80 px-4 py-2.5 transition-colors">
+      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 min-h-[44px]">
         
         {/* Left: Brand Identity & Live Clock */}
         <div className="flex items-center space-x-3">
@@ -96,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
             />
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-black tracking-tight text-xl md:text-2xl bg-gradient-to-r from-teal-300 via-cyan-200 to-emerald-300 bg-clip-text text-transparent drop-shadow-sm font-sans">
+                <span className="font-black tracking-tight text-xl md:text-2xl bg-gradient-to-r from-teal-300 via-cyan-200 to-emerald-300 bg-clip-text text-transparent drop-shadow-sm font-sans" style={{ letterSpacing: '-0.02em' }}>
                   IsoTrack
                 </span>
               </div>
@@ -107,28 +115,131 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
           <div className="h-5 w-px bg-slate-800 hidden md:block" />
 
           {/* Live System Clock */}
-          <div className="hidden lg:flex items-center space-x-1.5 bg-slate-800/60 border border-slate-700/50 rounded-md px-2.5 py-1 text-xs text-slate-300 font-mono">
+          <div className="hidden lg:flex items-center space-x-1.5 bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-1.5 text-xs text-slate-300 font-mono tabular-nums min-h-[36px]">
             <Clock className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
             <span>{currentTime}</span>
           </div>
+
+          {/* Quick Global Search Bar Trigger (Cmd+K) */}
+          <button
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="hidden md:flex items-center space-x-2 bg-slate-800/80 hover:bg-slate-700/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-all shadow-sm ml-2"
+            title="Pencarian Global & Command Palette (Ctrl/Cmd + K)"
+            aria-label="Pencarian Global (Ctrl atau Cmd + K)"
+          >
+            <span className="text-[11px]">Cari transaksi, aset, PIC...</span>
+            <kbd className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-slate-300">⌘K</kbd>
+          </button>
         </div>
 
-        {/* Right: Actions, Google SSO, Role Switcher, Language & Theme */}
+        {/* Right: Actions, Notifications, Google SSO, Role Switcher, Language & Theme */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
-          {/* Notifications / My Tasks quick badge */}
+          {/* Mobile Search Button */}
           <button
-            onClick={() => setActiveView('my_tasks')}
-            className="relative p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-colors"
-            title="Tugas Saya Berperan"
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="md:hidden min-h-[40px] min-w-[40px] p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center border border-slate-700"
+            title="Pencarian Cepat"
+            aria-label="Buka pencarian cepat"
           >
-            <Bell className="w-4 h-4" />
-            {pendingTasksCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-bounce">
-                {pendingTasksCount}
-              </span>
-            )}
+            <span className="text-xs font-mono font-bold text-teal-400">⌘K</span>
           </button>
+
+          {/* In-App Notification Center Popover */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotificationPopover(!showNotificationPopover)}
+              className="relative min-h-[44px] min-w-[44px] p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-colors flex items-center justify-center border border-slate-700/80"
+              title="Pusat Notifikasi In-App"
+              aria-label="Buka pusat notifikasi"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse tabular-nums shadow-md">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Popover */}
+            {showNotificationPopover && (
+              <div
+                className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden z-50 animate-fadeIn"
+                style={{ transformOrigin: 'top right' }}
+              >
+                <div className="p-3.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-slate-100">Notifikasi In-App</span>
+                    {unreadNotificationsCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold tabular-nums">
+                        {unreadNotificationsCount} baru
+                      </span>
+                    )}
+                  </div>
+                  {unreadNotificationsCount > 0 && (
+                    <button
+                      onClick={markAllNotificationsAsRead}
+                      className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold"
+                    >
+                      Tandai semua dibaca
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60 p-1">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400">
+                      Tidak ada notifikasi baru saat ini.
+                    </div>
+                  ) : (
+                    notifications.map(notif => (
+                      <div
+                        key={notif.id}
+                        onClick={() => {
+                          markNotificationAsRead(notif.id);
+                          if (notif.lead_id) {
+                            setSelectedLeadId(notif.lead_id);
+                            setShowNotificationPopover(false);
+                          }
+                        }}
+                        className={`p-3 rounded-xl transition-all cursor-pointer flex items-start space-x-2.5 ${
+                          !notif.read ? 'bg-slate-800/90 border border-teal-500/30' : 'hover:bg-slate-800/40 text-slate-400'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold ${
+                          notif.type === 'approval'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : notif.type === 'revision'
+                            ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                            : notif.type === 'sla_warning'
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            : 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                        }`}>
+                          {notif.type === 'approval' ? '✓' : notif.type === 'revision' ? '!' : notif.type === 'sla_warning' ? '⏱' : 'i'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-200 truncate">
+                              {notif.title}
+                            </span>
+                            {!notif.read && (
+                              <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0 ml-1.5" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                            {notif.message}
+                          </p>
+                          <span className="text-[9px] text-slate-500 font-mono mt-1 block">
+                            {new Date(notif.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Google Account Login/Logout Controls (Hanya Icon Gambar Akun & Logo Log In / Log Out) */}
           {isGoogleAuthenticated && googleAuthUser ? (
@@ -147,8 +258,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
                   setIsGoogleAuthenticated(false);
                   setGoogleAuthUser(null);
                 }}
-                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 transition-all flex items-center space-x-1"
+                className="min-h-[40px] px-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 transition-all flex items-center space-x-1"
                 title="Log Out / Keluar Akun Google"
+                aria-label="Log out akun Google"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="text-[11px] font-bold hidden sm:inline">Log Out</span>
@@ -157,10 +269,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
           ) : (
             <button
               onClick={onOpenGoogleLogin}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-teal-500/20"
+              className="flex items-center space-x-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-teal-500/20"
               title="Log In dengan Akun Google"
+              aria-label="Log in dengan Akun Google"
             >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
@@ -175,17 +288,19 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
           <div className="relative">
             <button
               onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${roleColors[currentUser.role]}`}
+              className={`flex items-center space-x-1.5 min-h-[44px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${roleColors[currentUser.role]}`}
               title="Beralih Peran Pengguna (Demo Switcher)"
+              aria-label="Pilih peran pengguna"
             >
               <Shield className="w-3.5 h-3.5" />
               <span className="capitalize">{currentUser.name.split(' ')[0]} ({currentUser.role})</span>
             </button>
 
             {showRoleDropdown && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50">
-                <div className="px-2 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 mb-1">
-                  Beralih Peran (Evaluasi Demo)
+              <div className="absolute right-0 mt-2 w-64 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50">
+                <div className="px-2 py-1.5 text-[11px] font-bold text-amber-400 uppercase tracking-wider border-b border-slate-800 mb-1 flex items-center justify-between">
+                  <span>[Mode Demo] Switch Role</span>
+                  <span className="text-[9px] text-slate-500 font-normal">Akan dilepas saat auth real</span>
                 </div>
                 <button
                   onClick={() => { switchUserRole('karyawan'); setShowRoleDropdown(false); }}
@@ -218,6 +333,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
                   {currentUser.role === 'reviewer' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
                 </button>
                 <button
+                  onClick={() => { switchUserRole('operasional'); setShowRoleDropdown(false); }}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between hover:bg-slate-800 transition-colors ${currentUser.role === 'operasional' ? 'bg-slate-800 font-bold text-teal-400' : 'text-slate-300'}`}
+                >
+                  <div>
+                    <div>Rian Utomo</div>
+                    <div className="text-[10px] text-slate-500">Operasional Lapangan & Depo</div>
+                  </div>
+                  {currentUser.role === 'operasional' && <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />}
+                </button>
+                <button
                   onClick={() => { switchUserRole('admin'); setShowRoleDropdown(false); }}
                   className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between hover:bg-slate-800 transition-colors ${currentUser.role === 'admin' ? 'bg-slate-800 font-bold text-emerald-400' : 'text-slate-300'}`}
                 >
@@ -234,8 +359,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
           {/* Language Switcher */}
           <button
             onClick={() => setLanguage(language === 'id' ? 'en' : 'id')}
-            className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-bold flex items-center space-x-1 border border-slate-700"
+            className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-bold flex items-center justify-center space-x-1 border border-slate-700"
             title="Ganti Bahasa (Multi-Language)"
+            aria-label="Ganti bahasa aplikasi"
           >
             <Globe className="w-3.5 h-3.5 text-teal-400" />
             <span className="uppercase">{language}</span>
@@ -245,8 +371,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
           <div className="relative">
             <button
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+              className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center justify-center"
               title="Pengaturan Tema & Warna Aksen"
+              aria-label="Pengaturan tema tampilan dan warna aksen"
             >
               <Palette className="w-4 h-4 text-teal-400" />
             </button>
