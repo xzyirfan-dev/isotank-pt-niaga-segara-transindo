@@ -1,12 +1,34 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   LayoutDashboard, CheckSquare, Truck, PlusCircle, BarChart3,
-  Sparkles, FileText, Settings, Users, ShieldCheck, Database, RefreshCw
+  Sparkles, FileText, Settings, Users, ShieldCheck, Database, RefreshCw,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const Sidebar: React.FC = () => {
   const { activeView, setActiveView, currentUser, leads, resetDemoData } = useApp();
+
+  // Collapsed / Minimized sidebar state with localStorage persistence
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('isotrack_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('isotrack_sidebar_collapsed', String(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
 
   // Count my pending tasks
   const myPendingTasksCount = leads.filter(lead => {
@@ -73,55 +95,124 @@ export const Sidebar: React.FC = () => {
   }, [currentUser.role, myPendingTasksCount]);
 
   return (
-    <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0">
-      <div className="space-y-6">
+    <aside
+      className={`bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'w-full md:w-20 p-2.5' : 'w-full md:w-64 p-4'
+      }`}
+    >
+      <div className="space-y-4">
         
-        {/* Logged-In Employee Profile Banner (Foto kiri | Kanan line 1: Nama + Tag Karyawan | Line 2: Jabatan | Line 3: Email Google) */}
-        <div className="p-3 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 shadow-md">
-          <div className="flex items-center space-x-2.5">
-            {/* Sebelah kiri foto */}
-            <div className="relative shrink-0">
+        {/* Toggle Minimize / Expand Header Bar */}
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} pb-1`}>
+          {!isCollapsed && (
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono pl-1">
+              MENU OPERASIONAL
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={toggleCollapse}
+            className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-teal-500 hover:text-slate-950 text-slate-300 border border-slate-700/60 transition-all shadow-sm active:scale-95 flex items-center justify-center shrink-0"
+            title={isCollapsed ? 'Perluas Menu Side Bar' : 'Kecilkan Menu Side Bar'}
+            aria-label={isCollapsed ? 'Perluas Menu Side Bar' : 'Kecilkan Menu Side Bar'}
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4 text-teal-400" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4 text-slate-300" />
+            )}
+          </button>
+        </div>
+
+        {/* Logged-In Employee Profile Banner */}
+        {isCollapsed ? (
+          /* Minimized Profile: Centered Avatar with Status Dot and Tooltip */
+          <div className="flex justify-center py-1">
+            <div
+              className="relative group cursor-pointer"
+              title={`${currentUser.name} (${currentUser.role.toUpperCase()})\n${currentUser.department}\n${currentUser.email}`}
+            >
               <img
                 src={currentUser.avatar}
                 alt={currentUser.name}
-                className="w-11 h-11 rounded-xl object-cover border-2 border-teal-500/40 shadow-sm"
+                className="w-10 h-10 rounded-xl object-cover border-2 border-teal-500/40 shadow-sm transition-transform group-hover:scale-105"
               />
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" title="Status Google Sign-In Aktif" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" />
             </div>
-
-            {/* Kanan */}
-            <div className="min-w-0 flex-1 space-y-0.5">
-              {/* Baris 1: Nama + Tag Karyawan di sebelah kanan nama */}
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[11px] font-extrabold text-slate-100 truncate leading-tight" title={currentUser.name}>
-                  {currentUser.name}
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[8px] font-extrabold bg-teal-500/20 text-teal-300 uppercase border border-teal-500/30 shrink-0">
-                  {currentUser.role}
-                </span>
+          </div>
+        ) : (
+          /* Expanded Full Profile Banner */
+          <div className="p-3 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 shadow-md">
+            <div className="flex items-center space-x-2.5">
+              {/* Sebelah kiri foto */}
+              <div className="relative shrink-0">
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-11 h-11 rounded-xl object-cover border-2 border-teal-500/40 shadow-sm"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" title="Status Google Sign-In Aktif" />
               </div>
 
-              {/* Baris 2: Jabatan */}
-              <div className="text-[10px] font-semibold text-teal-400 truncate leading-tight" title={currentUser.department}>
-                {currentUser.department}
-              </div>
+              {/* Kanan */}
+              <div className="min-w-0 flex-1 space-y-0.5">
+                {/* Baris 1: Nama + Tag Karyawan di sebelah kanan nama */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-extrabold text-slate-100 truncate leading-tight" title={currentUser.name}>
+                    {currentUser.name}
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded text-[8px] font-extrabold bg-teal-500/20 text-teal-300 uppercase border border-teal-500/30 shrink-0">
+                    {currentUser.role}
+                  </span>
+                </div>
 
-              {/* Baris 3: Email Google Login */}
-              <div className="text-[9px] text-slate-400 font-mono truncate leading-tight" title={currentUser.email}>
-                {currentUser.email}
+                {/* Baris 2: Jabatan */}
+                <div className="text-[10px] font-semibold text-teal-400 truncate leading-tight" title={currentUser.department}>
+                  {currentUser.department}
+                </div>
+
+                {/* Baris 3: Email Google Login */}
+                <div className="text-[9px] text-slate-400 font-mono truncate leading-tight" title={currentUser.email}>
+                  {currentUser.email}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Navigation Menu Links */}
-        <nav className="space-y-1">
-          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            MENU OPERASIONAL
-          </div>
+        <nav className="space-y-1.5">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+
+            if (isCollapsed) {
+              /* Minimized Item: Icon Only with Floating Badge and Tooltip */
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveView(item.id)}
+                  title={item.label}
+                  className={`w-full h-11 flex items-center justify-center rounded-xl transition-all relative group ${
+                    isActive
+                      ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20 font-bold'
+                      : item.highlight
+                      ? 'text-teal-300 hover:bg-slate-800 border border-teal-500/20'
+                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-slate-950' : item.highlight ? 'text-teal-400' : 'text-slate-400'}`} />
+
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 text-[9px] rounded-full font-black bg-rose-500 text-white flex items-center justify-center shadow-md animate-pulse">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            }
+
+            /* Expanded Item: Icon + Full Label + Badge */
             return (
               <button
                 key={item.id}
@@ -136,7 +227,7 @@ export const Sidebar: React.FC = () => {
               >
                 <div className="flex items-center space-x-2.5">
                   <Icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${isActive ? 'text-slate-950' : item.highlight ? 'text-teal-400' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </div>
 
                 {item.badge !== undefined && item.badge > 0 && (
@@ -151,27 +242,55 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer Info & Demo Data Reset Button */}
-      <div className="pt-4 border-t border-slate-800 space-y-3">
-        <div className="flex items-center justify-between text-[11px] text-slate-400 px-2">
-          <span className="flex items-center space-x-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
-            <span>SLA Guard Active</span>
-          </span>
-          <span className="text-[10px] font-mono text-slate-400">v3.2</span>
-        </div>
+      <div className="pt-3 border-t border-slate-800 space-y-2">
+        {isCollapsed ? (
+          /* Minimized Footer: Centered Icons with Tooltips */
+          <div className="flex flex-col items-center space-y-2">
+            <div
+              className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400 border border-teal-500/20 cursor-help"
+              title="SLA Guard Active - v3.2"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </div>
 
-        <button
-          onClick={() => {
-            if (confirm('Apakah Anda yakin ingin mengembalikan seluruh data transaksi ke kondisi awal demo?')) {
-              resetDemoData();
-            }
-          }}
-          className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-[11px] font-medium text-slate-300 transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-          <span>Reset Data Demo</span>
-        </button>
+            <button
+              onClick={() => {
+                if (confirm('Apakah Anda yakin ingin mengembalikan seluruh data transaksi ke kondisi awal demo?')) {
+                  resetDemoData();
+                }
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800/80 hover:bg-rose-500 hover:text-white text-slate-400 border border-slate-700/60 transition-colors shadow-sm"
+              title="Reset Data Demo"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          /* Expanded Footer */
+          <>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 px-2">
+              <span className="flex items-center space-x-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+                <span>SLA Guard Active</span>
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">v3.2</span>
+            </div>
+
+            <button
+              onClick={() => {
+                if (confirm('Apakah Anda yakin ingin mengembalikan seluruh data transaksi ke kondisi awal demo?')) {
+                  resetDemoData();
+                }
+              }}
+              className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-[11px] font-medium text-slate-300 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+              <span>Reset Data Demo</span>
+            </button>
+          </>
+        )}
       </div>
     </aside>
   );
 };
+

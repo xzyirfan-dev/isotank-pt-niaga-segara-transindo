@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  X, Download, Eye, Printer, FileText, Image as ImageIcon, ShieldCheck,
+  X, Download, Eye, FileText, Image as ImageIcon, ShieldCheck,
   CheckCircle2, ZoomIn, ZoomOut, RotateCw, ExternalLink, Lock
 } from 'lucide-react';
 import { Evidence } from '../types';
@@ -76,10 +76,6 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
     document.body.removeChild(a);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="fixed inset-0 z-60 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
       <div className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95">
@@ -134,23 +130,12 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
             )}
 
             <button
-              onClick={handleDownload}
-              className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-extrabold text-xs hover:bg-teal-400 flex items-center space-x-1.5 shadow-lg shadow-teal-500/20"
+              onClick={onClose}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-500 text-xs font-bold transition-all no-print"
+              title="Tutup / Keluar (Esc)"
             >
-              <Download className="w-4 h-4" />
-              <span>Unduh Berkas</span>
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 no-print"
-              title="Cetak Berkas"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
-
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white no-print">
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 stroke-[2.5]" />
+              <span>Tutup</span>
             </button>
           </div>
         </div>

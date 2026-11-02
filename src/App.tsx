@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -17,11 +17,44 @@ import { AiRecommendationsView } from './views/AiRecommendationsView';
 import { SystemLogView } from './views/SystemLogView';
 import { AdminView } from './views/AdminView';
 
+import { PublicClientTrackingView } from './views/PublicClientTrackingView';
+
 const MainLayout: React.FC = () => {
-  const { activeView, setActiveView, selectedLeadId, setSelectedLeadId } = useApp();
+  const {
+    activeView, setActiveView, selectedLeadId, setSelectedLeadId,
+    publicTrackingStore, recordClientLinkView
+  } = useApp();
 
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
+
+  // Standalone Public Client Route Detection (/t/<token>)
+  const pathname = window.location.pathname;
+  const isPublicRoute = pathname.startsWith('/t/') || window.location.search.includes('token=');
+
+  if (isPublicRoute) {
+    let token = '';
+    if (pathname.startsWith('/t/')) {
+      token = pathname.replace('/t/', '').split('/')[0];
+    } else {
+      const urlParams = new URLSearchParams(window.location.search);
+      token = urlParams.get('token') || '';
+    }
+
+    const payload = token ? (publicTrackingStore[token] || null) : null;
+
+    useEffect(() => {
+      if (token && payload) {
+        recordClientLinkView(token);
+      }
+    }, [token, payload]);
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+        <PublicClientTrackingView payload={payload} />
+      </div>
+    );
+  }
 
   const handleOpenNewLeadModal = () => {
     setIsNewLeadModalOpen(true);

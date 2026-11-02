@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { FileText, Search, ShieldCheck, Download, Filter } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { downloadAuditLogsPDF } from '../utils/reportExport';
 
 export const SystemLogView: React.FC = () => {
-  const { auditLogs } = useApp();
+  const { auditLogs, currentUser } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
@@ -22,6 +23,18 @@ export const SystemLogView: React.FC = () => {
     return true;
   });
 
+  const handleExportPDF = () => {
+    downloadAuditLogsPDF(filteredLogs, {
+      title: 'Laporan Audit Trail & Log Aktivitas Sistem Informasi IsoTrack',
+      reportCode: `NST-LOG-AUD-${Date.now().toString().slice(-6)}`,
+      periodText: 'Semua Rekord Transaksi Audit Log',
+      generatedBy: currentUser?.name || 'Administrator System',
+      generatedRole: currentUser?.role || 'SYSTEM_AUDITOR',
+      generatedAt: new Date().toLocaleString('id-ID'),
+      totalRecords: filteredLogs.length
+    });
+  };
+
   return (
     <div className="space-y-6">
       
@@ -36,6 +49,15 @@ export const SystemLogView: React.FC = () => {
             Riwayat log sistem resmi yang mencatat setiap perubahan status, pengunggahan dokumen, dan persetujuan lengkap dengan jam detik & nomor LOG.
           </p>
         </div>
+
+        <button
+          onClick={handleExportPDF}
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-md transition-all hover:scale-105 active:scale-95"
+          title="Unduh Laporan Audit Trail Resmi Format PDF Lengkap dengan Kop Surat & ISO Stamp"
+        >
+          <Download className="w-4 h-4 text-slate-950" />
+          <span>Unduh PDF Log Audit</span>
+        </button>
       </div>
 
       {/* Filter & Search Bar */}

@@ -3,7 +3,8 @@ import {
   User, Asset, Lead, Evidence, Issue, Comment, AuditLog, ClosureArchive,
   LeadStatus, Language, AccentColor, PeriodFilter, UserRole,
   InAppNotification, MasterDataConfig, TableDensity, LeadViewMode, DetailDisplayMode, SavedFilterPreset,
-  OperationalSubStageStatus, OperationalSubStageItem
+  OperationalSubStageStatus, OperationalSubStageItem,
+  ClientStageMappingConfig, ClientTrackingLinkInfo, PublicTrackingPayload
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ASSETS, INITIAL_LEADS, INITIAL_EVIDENCES,
@@ -11,7 +12,11 @@ import {
   INITIAL_NOTIFICATIONS, INITIAL_MASTER_DATA, INITIAL_SAVED_PRESETS
 } from '../data/mockData';
 import { isValidTransition } from '../utils/stateMachine';
-import { createDefaultOperationalSubStages } from '../utils/operationalStages';
+import { createDefaultOperationalSubStages, syncOperationalSubStages } from '../utils/operationalStages';
+import {
+  DEFAULT_CLIENT_STAGE_MAPPINGS, generateCryptographicToken, computeSha256Hash,
+  generatePublicTrackingPayload, calculateHighestClientStageOrder
+} from '../utils/clientTracking';
 
 interface AppContextType {
   currentUser: User;
@@ -102,6 +107,7 @@ interface AppContextType {
       vessel_ticket_doc_url?: string;
     }
   ) => void;
+  updateLeadTransportDoc: (leadId: string, transportDocName: string) => void;
   updateLeadFinalDelivery: (
     leadId: string,
     deliveryData: {
@@ -147,6 +153,16 @@ interface AppContextType {
 
   // Filtered Leads helper
   filteredLeads: Lead[];
+
+  // FASE 8: Public Client Tracking Link & Whitelist Store
+  publicTrackingStore: Record<string, PublicTrackingPayload>;
+  clientStageMappings: ClientStageMappingConfig[];
+  generateClientLink: (leadId: string, maxDaysAfterClosed?: number) => { success: boolean; token?: string; url?: string; message: string };
+  revokeClientLink: (leadId: string) => { success: boolean; message: string };
+  regenerateClientLink: (leadId: string) => { success: boolean; token?: string; url?: string; message: string };
+  setClientActionNeeded: (leadId: string, needsAction: boolean, message?: string) => void;
+  updateClientStageMappings: (newMappings: ClientStageMappingConfig[]) => void;
+  recordClientLinkView: (token: string) => void;
 }
 
 export interface ToastNotification {
@@ -171,7 +187,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const parsed = JSON.parse(saved);
         return {
           users: parsed.users || INITIAL_USERS,
-          leads: parsed.leads || INITIAL_LEADS,
+          leads: (parsed.leads || INITIAL_LEADS).map((l: Lead) => ({
+            ...l,
+            operationalSubStages: syncOperationalSubStages(l.operationalSubStages, l.current_step),
+          })),
           assets: parsed.assets || INITIAL_ASSETS,
           evidences: parsed.evidences || INITIAL_EVIDENCES,
           issues: parsed.issues || INITIAL_ISSUES,
@@ -183,7 +202,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           tableDensity: (parsed.tableDensity as TableDensity) || 'comfortable',
           leadViewMode: (parsed.leadViewMode as LeadViewMode) || 'table',
           detailDisplayMode: (parsed.detailDisplayMode as DetailDisplayMode) || 'drawer',
-          savedFilterPresets: parsed.savedFilterPresets || INITIAL_SAVED_PRESETS,
+          savedFilterPresets: (parsed.savedFilterPresets || INITIAL_SAVED_PRESETS).map((p: SavedFilterPreset) => {
+            if (p.id === 'preset-kritis') return { ...p, name: '🔴 Kritis' };
+            if (p.id === 'preset-kapal') return { ...p, name: '🚢 Laut' };
+            if (p.id === 'preset-kimia') return { ...p, name: '🧪 Kimia' };
+            if (p.id === 'preset-approval') return { ...p, name: '🟡 Approval' };
+            return p;
+          }),
         };
       }
     } catch (e) {
@@ -191,7 +216,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return {
       users: INITIAL_USERS,
-      leads: INITIAL_LEADS,
+      leads: INITIAL_LEADS.map((l: Lead) => ({
+        ...l,
+        operationalSubStages: syncOperationalSubStages(l.operationalSubStages, l.current_step),
+      })),
       assets: INITIAL_ASSETS,
       evidences: INITIAL_EVIDENCES,
       issues: INITIAL_ISSUES,
@@ -250,6 +278,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setNotifications(prev => [newNotif, ...prev]);
   };
+
+  // FASE 8: Client Stage Mappings & Public Tracking Store State
+  const [clientStageMappings, setClientStageMappings] = useState<ClientStageMappingConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('isotrack_client_stage_mappings');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return DEFAULT_CLIENT_STAGE_MAPPINGS;
+  });
+
+  const [publicTrackingStore, setPublicTrackingStore] = useState<Record<string, PublicTrackingPayload>>({});
+
+  // Synchronize Whitelisted Public Tracking Store whenever Leads or Mappings Change
+  useEffect(() => {
+    const store: Record<string, PublicTrackingPayload> = {};
+    leads.forEach((l) => {
+      if (l.clientLinkInfo && l.clientLinkInfo.isActive) {
+        const payload = generatePublicTrackingPayload(l, clientStageMappings, l.highestClientStageOrder || 1);
+        if (payload) {
+          store[l.clientLinkInfo.token] = payload;
+        }
+      }
+    });
+    setPublicTrackingStore(store);
+  }, [leads, clientStageMappings]);
 
   // FASE 2: Master Data Management (Admin)
   const [masterData, setMasterData] = useState<MasterDataConfig>(initialData.masterData);
@@ -498,9 +551,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       progress_percentage: 10,
       created_at: nowIso,
       updated_at: nowIso,
+      operationalSubStages: createDefaultOperationalSubStages(1),
     };
 
     setLeads(prev => [newLead, ...prev]);
+
+    // Stage 1 Document Evidence Auto-Generation
+    const initialEvidences: Evidence[] = [
+      {
+        id: `ev-${Date.now()}-1`,
+        lead_id: newLeadId,
+        lead_code: generatedLeadCode,
+        stage: 'lead_created',
+        stage_step: 1,
+        file_type: 'surat_jalan',
+        file_name: `Surat_Jalan_${newLead.no_surat_jalan}.pdf`,
+        file_size: '1.2 MB',
+        uploaded_by: currentUser.name,
+        uploaded_by_role: currentUser.role,
+        uploaded_at: nowIso,
+        notes: `Dokumen Surat Jalan Resmi Klien: ${newLead.client_company || 'Perusahaan Klien'}`
+      },
+      {
+        id: `ev-${Date.now()}-2`,
+        lead_id: newLeadId,
+        lead_code: generatedLeadCode,
+        stage: 'lead_created',
+        stage_step: 1,
+        file_type: 'dokumen_transporter',
+        file_name: newLead.transport_doc_name || 'Surat_Penunjukan_Transporter.pdf',
+        file_size: '1.8 MB',
+        uploaded_by: currentUser.name,
+        uploaded_by_role: currentUser.role,
+        uploaded_at: nowIso,
+        notes: `Dokumen Absah Kemitraan Transport & SIM/STNK: ${newLead.transport_vendor_name || ''} - Supir: ${newLead.nama_supir || ''} (${newLead.no_plat_truk || ''})`
+      }
+    ];
+
+    if (newLead.is_inter_island && newLead.vessel_ticket_doc_name) {
+      initialEvidences.push({
+        id: `ev-${Date.now()}-3`,
+        lead_id: newLeadId,
+        lead_code: generatedLeadCode,
+        stage: 'lead_created',
+        stage_step: 1,
+        file_type: 'tiket_kapal',
+        file_name: newLead.vessel_ticket_doc_name,
+        file_size: '2.4 MB',
+        uploaded_by: currentUser.name,
+        uploaded_by_role: currentUser.role,
+        uploaded_at: nowIso,
+        notes: `Form Pemesanan & Tiket Booking Kapal Kargo Ro-Ro: ${newLead.shipping_company || 'Kapal Kargo'} - ${newLead.vessel_name || ''} (${newLead.voyage_number || ''})`
+      });
+    }
+
+    setEvidences(prev => [...initialEvidences, ...prev]);
     setAssets(prev => prev.map(a => a.id === leadData.asset_id ? { ...a, status: 'Beroperasi' } : a));
 
     appendAuditLog('CREATE_LEAD', 'Lead', newLeadId, `Membuat Lead Pengiriman Baru [${generatedLeadCode}] #${newLead.no_surat_jalan} (Aset: ${newLead.asset_code}, Rute: ${newLead.asal} -> ${newLead.tujuan})${newLead.is_inter_island ? ' [RUTE ANTAR-PULAU: ' + (newLead.shipping_company || 'Kapal Kargo') + ']' : ''}.`);
@@ -563,6 +668,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // Update Transport Document (STNK/SIM/Surat Penunjukan)
+  const updateLeadTransportDoc = (leadId: string, transportDocName: string) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? {
+      ...l,
+      transport_doc_name: transportDocName,
+      updated_at: new Date().toISOString()
+    } : l));
+
+    const target = leads.find(l => l.id === leadId);
+    appendAuditLog(
+      'UPDATE_TRANSPORT_DOC',
+      'Lead',
+      leadId,
+      `[ID Lead: ${target?.lead_code || leadId}] Melampirkan berkas dokumen absah transporter: ${transportDocName}.`
+    );
+  };
+
   // Transition Lead through 8 Stages
   const transitionLeadStage = (
     leadId: string,
@@ -579,6 +701,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         success: false,
         message: `Transisi tidak valid dari tahap ${lead.status} ke ${targetStage} ditolak oleh state machine sistem.`
       };
+    }
+
+    // VALIDATOR: STAGE 2 APPROVAL (In-Progress)
+    if (targetStage === 'in_progress') {
+      const hasTransportDoc = Boolean(lead.transport_doc_name) ||
+        evidences.some(e => e.lead_id === leadId && (e.file_type === 'dokumen_transporter' || e.file_type === 'surat_jalan'));
+      if (!hasTransportDoc) {
+        return {
+          success: false,
+          message: 'Instrumen Validasi: Dokumen absah kemitraan transportasi (Surat Perjanjian/STNK/SIM B2) belum diunggah! Tidak dapat melanjutkan approval.'
+        };
+      }
+      if (lead.is_inter_island) {
+        const hasVesselTicket = Boolean(lead.vessel_ticket_doc_name) ||
+          evidences.some(e => e.lead_id === leadId && e.file_type === 'tiket_kapal');
+        if (!hasVesselTicket) {
+          return {
+            success: false,
+            message: 'Instrumen Validasi: Pengiriman rute antar-pulau terdeteksi! Berkas form pemesanan / tiket kapal kargo laut wajib dilampirkan sebelum disetujui!'
+          };
+        }
+      }
     }
 
     if (targetStage === 'submission' || targetStage === 'review') {
@@ -630,6 +774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updated_at: nowIso,
       completed_at: targetStage === 'closed' ? nowIso : lead.completed_at,
       rejection_comment: comment || lead.rejection_comment,
+      operationalSubStages: syncOperationalSubStages(lead.operationalSubStages, targetStep),
     };
 
     setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
@@ -984,6 +1129,152 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // FASE 8: Client Link Management Methods
+  const generateClientLink = (leadId: string, maxDaysAfterClosed: number = 7) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return { success: false, message: 'Lead tidak ditemukan' };
+
+    const token = generateCryptographicToken();
+    const tokenHash = `sha256_${token.slice(0, 8)}`;
+    
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + 30);
+
+    const linkInfo: ClientTrackingLinkInfo = {
+      token,
+      tokenHash,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.name,
+      expiresAt: expDate.toISOString(),
+      isActive: true,
+      viewCount: 0,
+      maxDaysAfterClosed,
+    };
+
+    const highestOrder = calculateHighestClientStageOrder(lead, clientStageMappings, lead.highestClientStageOrder || 1);
+
+    setLeads(prev => prev.map(l => l.id === leadId ? {
+      ...l,
+      clientLinkInfo: linkInfo,
+      highestClientStageOrder: highestOrder,
+      updated_at: new Date().toISOString()
+    } : l));
+
+    appendAuditLog(
+      'CLIENT_LINK_GENERATED',
+      'Lead',
+      lead.id,
+      `Membuat link tracking unik publik untuk klien "${lead.client_company || lead.no_surat_jalan}". Token Base64URL 128-bit.`
+    );
+
+    const url = `${window.location.origin}/t/${token}`;
+    showToast({
+      type: 'success',
+      title: 'Link Tracking Klien Dibuat',
+      message: `Link unik aktif: ${url}`
+    });
+
+    return { success: true, token, url, message: 'Link tracking berhasil dibuat' };
+  };
+
+  const revokeClientLink = (leadId: string) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead || !lead.clientLinkInfo) return { success: false, message: 'Link tidak ditemukan' };
+
+    const oldToken = lead.clientLinkInfo.token;
+    setLeads(prev => prev.map(l => l.id === leadId ? {
+      ...l,
+      clientLinkInfo: {
+        ...l.clientLinkInfo!,
+        isActive: false
+      },
+      updated_at: new Date().toISOString()
+    } : l));
+
+    setPublicTrackingStore(prev => {
+      const copy = { ...prev };
+      delete copy[oldToken];
+      return copy;
+    });
+
+    appendAuditLog(
+      'CLIENT_LINK_REVOKED',
+      'Lead',
+      lead.id,
+      `Mencabut/mematikan link tracking klien untuk "${lead.client_company || lead.no_surat_jalan}". Token lama dinonaktifkan.`
+    );
+
+    showToast({
+      type: 'warning',
+      title: 'Link Tracking Dicabut',
+      message: 'Link lama langsung mati dan tidak dapat diakses lagi.'
+    });
+
+    return { success: true, message: 'Link tracking berhasil dicabut' };
+  };
+
+  const regenerateClientLink = (leadId: string) => {
+    revokeClientLink(leadId);
+    return generateClientLink(leadId);
+  };
+
+  const setClientActionNeeded = (leadId: string, needsAction: boolean, message?: string) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId && l.clientLinkInfo) {
+        return {
+          ...l,
+          clientLinkInfo: {
+            ...l.clientLinkInfo,
+            needsClientAction: needsAction,
+            clientActionMessage: message || 'Menunggu kelengkapan dokumen dari Anda.'
+          }
+        };
+      }
+      return l;
+    }));
+
+    appendAuditLog(
+      'CLIENT_ACTION_FLAG_UPDATED',
+      'Lead',
+      leadId,
+      `Memperbarui status penanda tindakan klien: ${needsAction ? 'AKTIF' : 'NONAKTIF'}.`
+    );
+  };
+
+  const updateClientStageMappings = (newMappings: ClientStageMappingConfig[]) => {
+    setClientStageMappings(newMappings);
+    try {
+      localStorage.setItem('isotrack_client_stage_mappings', JSON.stringify(newMappings));
+    } catch (e) {}
+    appendAuditLog(
+      'CLIENT_STAGE_MAPPING_UPDATED',
+      'MasterData',
+      'Admin',
+      'Memperbarui tabel konfigurasi pemetaan tahap internal ke tahap tampilan klien.'
+    );
+    showToast({
+      type: 'success',
+      title: 'Konfigurasi Pemetaan Disimpan',
+      message: 'Aturan tampilan tahap publik klien berhasil diperbarui.'
+    });
+  };
+
+  const recordClientLinkView = (token: string) => {
+    setLeads(prev => prev.map(l => {
+      if (l.clientLinkInfo && l.clientLinkInfo.token === token) {
+        return {
+          ...l,
+          clientLinkInfo: {
+            ...l.clientLinkInfo,
+            viewCount: (l.clientLinkInfo.viewCount || 0) + 1,
+            lastOpenedAt: new Date().toLocaleString('id-ID')
+          }
+        };
+      }
+      return l;
+    }));
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1020,6 +1311,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPeriodFilter,
         createNewLead,
         updateLeadVesselBooking,
+        updateLeadTransportDoc,
         updateLeadFinalDelivery,
         transitionLeadStage,
         updateOperationalSubStage,
@@ -1057,6 +1349,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bulkTransitionStage,
         bulkAssignPic,
         requestRevisionWithReason,
+
+        // FASE 8 Values
+        publicTrackingStore,
+        clientStageMappings,
+        generateClientLink,
+        revokeClientLink,
+        regenerateClientLink,
+        setClientActionNeeded,
+        updateClientStageMappings,
+        recordClientLinkView,
       }}
     >
       {children}

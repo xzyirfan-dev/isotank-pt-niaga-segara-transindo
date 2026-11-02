@@ -6,9 +6,14 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { STAGE_LIST } from '../data/stageConfig';
+import { createDefaultOperationalSubStages } from '../utils/operationalStages';
 import { EvidenceUploadModal } from './EvidenceUploadModal';
 import { ApprovalChecklistModal } from './ApprovalChecklistModal';
 import { FileViewerModal } from './FileViewerModal';
+import { downloadSingleLeadOfficialPDF, downloadClientServiceOrderPDF } from '../utils/reportExport';
+import { DigitalSignaturePad } from './DigitalSignaturePad';
+
+import { ClientPreviewModal } from './ClientPreviewModal';
 
 interface LeadDetailModalProps {
   leadId: string | null;
@@ -20,10 +25,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
     leads, evidences, issues, comments, currentUser, auditLogs, users,
     addIssue, resolveIssue, addComment, transitionLeadStage,
     updateLeadVesselBooking, updateLeadFinalDelivery,
-    detailDisplayMode, setDetailDisplayMode, requestRevisionWithReason
+    detailDisplayMode, setDetailDisplayMode, requestRevisionWithReason,
+    updateOperationalSubStage,
+    publicTrackingStore, generateClientLink, revokeClientLink,
+    regenerateClientLink, setClientActionNeeded, showToast
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'timeline' | 'jejak_bukti' | 'issues' | 'comments'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'operasional' | 'link_klien' | 'jejak_bukti' | 'issues' | 'comments' | 'esignature'>('timeline');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [subStageNotes, setSubStageNotes] = useState<Record<string, string>>({});
   const [newIssueDesc, setNewIssueDesc] = useState('');
   const [newCommentMsg, setNewCommentMsg] = useState('');
   const [activeViewerEvidence, setActiveViewerEvidence] = useState<any>(null);
@@ -111,28 +121,45 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
         } bg-slate-900 overflow-hidden flex flex-col animate-fadeIn`}>
           
           {/* Header Bar */}
-          <div className="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold">
-                <Truck className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 flex-wrap">
-                  <span className="px-2.5 py-0.5 rounded text-xs font-mono font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/40 tabular-nums">
-                    {lead.lead_code || 'LEAD-00101'}
-                  </span>
-                  <span className="font-extrabold text-slate-100 text-base font-mono">{lead.no_surat_jalan}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-teal-300 font-mono">
-                    Aset: {lead.asset_code}
-                  </span>
+          <div className="relative px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-800/95 border-b border-slate-700 flex flex-col gap-2.5 sm:gap-3 shrink-0">
+            {/* Top row: Left Info and Prominent Top-Right Exit Button */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold shrink-0 shadow-inner">
+                  <Truck className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-slate-400">
-                  Rute: <strong className="text-slate-200">{lead.asal}</strong> &rarr; <strong className="text-slate-200">{lead.tujuan}</strong>
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                    <span className="px-2.5 py-0.5 rounded text-xs font-mono font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/40 tabular-nums">
+                      {lead.lead_code || 'LEAD-00101'}
+                    </span>
+                    <span className="font-extrabold text-slate-100 text-sm sm:text-base font-mono truncate">{lead.no_surat_jalan}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-teal-300 font-mono">
+                      Aset: {lead.asset_code}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 truncate mt-0.5">
+                    Rute: <strong className="text-slate-200">{lead.asal}</strong> &rarr; <strong className="text-slate-200">{lead.tujuan}</strong>
+                  </div>
                 </div>
               </div>
+
+              {/* Pojok Kanan Atas: Tombol Keluar / Exit Besar & Jelas */}
+              <button
+                onClick={onClose}
+                className="shrink-0 flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm border-2 border-rose-300/40 shadow-lg shadow-rose-600/30 hover:shadow-rose-600/50 hover:scale-105 active:scale-95 transition-all group no-print cursor-pointer"
+                title="Keluar / Tutup Jendela Detail (Esc)"
+                aria-label="Tombol Keluar / Exit"
+              >
+                <div className="w-5 h-5 rounded-lg bg-black/25 flex items-center justify-center group-hover:bg-black/35 group-hover:rotate-90 transition-transform duration-200">
+                  <X className="w-4 h-4 stroke-[3] text-white" />
+                </div>
+                <span className="tracking-wider uppercase">KELUAR</span>
+              </button>
             </div>
 
-            <div className="flex items-center space-x-2">
+            {/* Second row: Status SLA Badge & Sub-Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-700/60">
               {/* SLA Badge */}
               <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center space-x-1 tabular-nums ${
                 isClosed
@@ -147,26 +174,42 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                 </span>
               </div>
 
-              {/* Drawer vs Modal Toggle */}
-              <button
-                onClick={() => setDetailDisplayMode(isDrawer ? 'modal' : 'drawer')}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-colors no-print"
-                title={isDrawer ? 'Beralih ke Tampilan Modal Layar Penuh' : 'Beralih ke Tampilan Drawer Samping'}
-              >
-                {isDrawer ? '⤢ Modal' : '⇥ Drawer'}
-              </button>
+              {/* Secondary utility actions: PDF Resmi, Surat Pemesanan (WO), Modal/Drawer, Print */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => downloadSingleLeadOfficialPDF(lead, currentUser)}
+                  className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md no-print transition-transform active:scale-95"
+                  title="Unduh Dokumen PDF Resmi Surat Jalan & BASTP (Kop Surat & TTD Pejabat)"
+                >
+                  <FileText className="w-4 h-4 text-slate-950" />
+                  <span>PDF Resmi</span>
+                </button>
 
-              <button
-                onClick={handlePrint}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors no-print"
-                title="Cetak Surat Jalan & Detail"
-              >
-                <Printer className="w-4 h-4" />
-              </button>
+                <button
+                  onClick={() => downloadClientServiceOrderPDF(lead, currentUser)}
+                  className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md no-print transition-transform active:scale-95"
+                  title="Unduh Surat Konfirmasi Pemesanan Jasa Logistik & Work Order Klien (B2B Formal)"
+                >
+                  <FileText className="w-4 h-4 text-slate-950" />
+                  <span>Surat Pemesanan (WO)</span>
+                </button>
 
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white no-print">
-                <X className="w-5 h-5" />
-              </button>
+                <button
+                  onClick={() => setDetailDisplayMode(isDrawer ? 'modal' : 'drawer')}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-colors no-print"
+                  title={isDrawer ? 'Beralih ke Tampilan Modal Layar Penuh' : 'Beralih ke Tampilan Drawer Samping'}
+                >
+                  {isDrawer ? '⤢ Modal' : '⇥ Drawer'}
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors no-print"
+                  title="Cetak Surat Jalan & Detail"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -282,6 +325,36 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
               Timeline 8 Tahap
             </button>
             <button
+              onClick={() => setActiveTab('operasional')}
+              className={`px-4 py-2.5 font-bold border-b-2 transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'operasional'
+                  ? 'border-cyan-400 text-cyan-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Operasional Lapangan</span>
+              {lead.operationalSubStages && (
+                <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                  {lead.operationalSubStages.filter(s => s.status === 'selesai').length}/5
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('link_klien')}
+              className={`px-4 py-2.5 font-bold border-b-2 transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'link_klien'
+                  ? 'border-teal-400 text-teal-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+              <span>Link Tracking Klien</span>
+              {lead.clientLinkInfo?.isActive && (
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('jejak_bukti')}
               className={`px-4 py-2.5 font-bold border-b-2 transition-colors flex items-center space-x-1.5 ${
                 activeTab === 'jejak_bukti'
@@ -318,6 +391,20 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
               }`}
             >
               <span>Diskusi & Komentar ({leadComments.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('esignature')}
+              className={`px-4 py-2.5 font-bold border-b-2 transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'esignature'
+                  ? 'border-emerald-400 text-emerald-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Verifikasi TTD Digital</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                E-SIGN SAH
+              </span>
             </button>
           </div>
 
@@ -658,6 +745,342 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
               </div>
             )}
 
+            {/* TAB OPERASIONAL LAPANGAN (SESI 7) */}
+            {activeTab === 'operasional' && (
+              <div className="space-y-6">
+                <div className="p-4 rounded-xl bg-cyan-950/40 border border-cyan-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-cyan-300 uppercase tracking-wider flex items-center space-x-2">
+                      <Truck className="w-4 h-4 text-cyan-400" />
+                      <span>Sub-Tahap Pencatatan Kejadian Operasional Lapangan</span>
+                    </h4>
+                    <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
+                      PT Niaga Segara Trasindo
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Pencatatan real-time 5 kejadian fisik armada & isotank di lapangan (di samping alur 8-tahap transaksi internal). Peran <strong className="text-cyan-300 capitalize font-bold">Operasional</strong> & <strong className="text-cyan-300 capitalize font-bold">Admin</strong> dapat memperbarui status.
+                  </p>
+                </div>
+
+                {/* Sub-stages Timeline */}
+                <div className="space-y-4">
+                  {(lead.operationalSubStages || createDefaultOperationalSubStages(lead.current_step)).map((sub, idx, arr) => {
+                    const isPassed = sub.status === 'selesai';
+                    const isCurrent = sub.status === 'berjalan';
+                    const isCanEdit = (currentUser.role === 'operasional' || currentUser.role === 'admin') && !isClosed;
+                    const isSequentialBlocked = idx > 0 && arr[idx - 1].status !== 'selesai' && currentUser.role !== 'admin';
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className={`p-4 rounded-xl border transition-all ${
+                          isCurrent
+                            ? 'bg-slate-800/95 border-amber-500/80 ring-2 ring-amber-500/30 shadow-lg'
+                            : isPassed
+                            ? 'bg-slate-800/50 border-emerald-500/40 text-slate-200'
+                            : 'bg-slate-900/50 border-slate-800 opacity-70'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex items-start space-x-3 flex-1 min-w-[240px]">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                              isPassed
+                                ? 'bg-emerald-500 text-slate-950 shadow-md'
+                                : isCurrent
+                                ? 'bg-amber-400 text-slate-950 font-black animate-pulse'
+                                : 'bg-slate-800 text-slate-500 border border-slate-700'
+                            }`}>
+                              {isPassed ? <Check className="w-5 h-5 stroke-[3]" /> : sub.stepOrder}
+                            </div>
+
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                                <h5 className="font-extrabold text-slate-100 text-xs">
+                                  {sub.title}
+                                </h5>
+                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold ${
+                                  isPassed
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                    : isCurrent
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                }`}>
+                                  {sub.status === 'selesai' ? '✓ SELESAI' : sub.status === 'berjalan' ? '▶ BERJALAN' : 'BELUM DIMULAI'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 leading-relaxed">{sub.description}</p>
+                              <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                                <span>Target SLA Sub-Tahap: <strong className="text-slate-300">{sub.targetHours} Jam</strong></span>
+                                <span>PIC Lapangan: <strong className="text-slate-200">{sub.fieldPic || 'Petugas Depo Lapangan'}</strong></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Timestamp Details */}
+                          <div className="text-right text-[11px] space-y-0.5 shrink-0 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 min-w-[180px]">
+                            {sub.startTime && (
+                              <div className="text-slate-300">
+                                Waktu Mulai: <strong className="text-teal-300 font-mono">{new Date(sub.startTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</strong>
+                              </div>
+                            )}
+                            {sub.endTime && (
+                              <div className="text-slate-300">
+                                Waktu Selesai: <strong className="text-emerald-300 font-mono">{new Date(sub.endTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</strong>
+                              </div>
+                            )}
+                            {!sub.endTime && sub.estimatedEndTime && (
+                              <div className="text-amber-300">
+                                Est. Selesai: <strong className="font-mono">{new Date(sub.estimatedEndTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</strong>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Internal Notes Display & Entry */}
+                        <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 font-bold uppercase tracking-wider flex items-center space-x-1">
+                              <ShieldCheck className="w-3 h-3 text-cyan-400" />
+                              <span>Catatan Lapangan Internal (TIDAK DITERUSKAN KE PORTAL KLIEN)</span>
+                            </span>
+                            {sub.internalNotes && (
+                              <span className="text-slate-500 italic">Tercatat di Audit Log</span>
+                            )}
+                          </div>
+
+                          {sub.internalNotes && (
+                            <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-300 leading-relaxed font-mono">
+                              {sub.internalNotes}
+                            </div>
+                          )}
+
+                          {isCanEdit && !isPassed && (
+                            <div className="space-y-2 pt-1">
+                              <input
+                                type="text"
+                                value={subStageNotes[sub.id] || ''}
+                                onChange={(e) => setSubStageNotes({ ...subStageNotes, [sub.id]: e.target.value })}
+                                placeholder="Tambah catatan internal lapangan (contoh: Pengecekan valve 2-way OK, segel #8841 terpasang)..."
+                                className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                              />
+
+                              {isSequentialBlocked ? (
+                                <div className="text-[11px] text-amber-400 bg-amber-500/10 p-2 rounded-lg border border-amber-500/30 flex items-center space-x-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>Selesaikan sub-tahap ke-{(sub.stepOrder || sub.stepNumber) - 1} ({arr[(sub.stepOrder || sub.stepNumber) - 2]?.title}) terlebih dahulu sebelum memulai/menyelesaikan sub-tahap ini.</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-2">
+                                  {sub.status === 'belum' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        updateOperationalSubStage(lead.id, sub.id, 'berjalan', subStageNotes[sub.id]);
+                                        setSubStageNotes({ ...subStageNotes, [sub.id]: '' });
+                                      }}
+                                      className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md active:scale-95 transition-all"
+                                    >
+                                      <span>▶ Mulai Sub-Tahap Ini</span>
+                                    </button>
+                                  )}
+
+                                  {(sub.status === 'berjalan' || sub.status === 'belum') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        updateOperationalSubStage(lead.id, sub.id, 'selesai', subStageNotes[sub.id]);
+                                        setSubStageNotes({ ...subStageNotes, [sub.id]: '' });
+                                      }}
+                                      className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md active:scale-95 transition-all"
+                                    >
+                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                      <span>Tandai Sub-Tahap Selesai</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB LINK TRACKING KLIEN (SESI 8) */}
+            {activeTab === 'link_klien' && (
+              <div className="space-y-6">
+                <div className="p-4 rounded-xl bg-teal-950/40 border border-teal-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-teal-300 uppercase tracking-wider flex items-center space-x-2">
+                      <ExternalLink className="w-4 h-4 text-teal-400" />
+                      <span>Manajemen Link Tracking Unik Klien (Public Access)</span>
+                    </h4>
+                    <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-mono font-bold">
+                      TOKEN 128-BIT BASE64URL
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Klien menerima 1 link acak unik langsung (tanpa login) untuk melihat progres layanan. Data yang ditampilkan disaring ketat melalui <strong className="text-teal-300">Daftar Putih (Whitelist)</strong>. Catatan internal, nilai kontrak, dan alasan penolakan 100% tersembunyi.
+                  </p>
+                </div>
+
+                {!lead.clientLinkInfo || !lead.clientLinkInfo.isActive ? (
+                  <div className="p-8 rounded-2xl bg-slate-800/30 border border-slate-800 text-center space-y-4">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                      <ExternalLink className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-100">Belum Ada Link Tracking Aktif Untuk Lead Ini</h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                        Buat link acak kriptografis unik yang aman untuk dikirimkan kepada klien ({lead.client_company || 'Pemesan'}).
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => generateClientLink(lead.id)}
+                      className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs shadow-lg shadow-teal-500/20 active:scale-95 transition-all inline-flex items-center space-x-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>+ Buat Link Tracking Unik Klien</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Link URL Box & Actions */}
+                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-teal-500/40 space-y-3 shadow-lg">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-200">URL Tautan Akses Klien:</span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold">
+                          ● LINK AKTIF
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const trackingUrl = `${window.location.origin}/t/${lead.clientLinkInfo.token}`;
+                        const waText = `Yth. Tim ${lead.client_company || 'Klien'},\n\nBerikut link tracking resmi untuk memantau progres pengiriman Surat Jalan ${lead.no_surat_jalan} (Rute ${lead.asal} -> ${lead.tujuan}):\n\n${trackingUrl}\n\nTerima kasih,\nPT Niaga Segara Trasindo`;
+                        const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                readOnly
+                                value={trackingUrl}
+                                className="flex-1 bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs font-mono text-teal-300 focus:outline-none select-all"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(trackingUrl);
+                                  showToast({
+                                    type: 'success',
+                                    title: 'Link Disalin!',
+                                    message: 'URL tracking berhasil disalin ke clipboard.'
+                                  });
+                                }}
+                                className="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs shadow-sm flex items-center space-x-1.5"
+                              >
+                                <span>Salin</span>
+                              </button>
+                            </div>
+
+                            {/* Action Buttons Matrix */}
+                            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center space-x-1.5 shadow-sm"
+                              >
+                                <span>💬 Kirim via WhatsApp</span>
+                              </a>
+
+                              <button
+                                type="button"
+                                onClick={() => setIsPreviewModalOpen(true)}
+                                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700 flex items-center space-x-1.5"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-teal-400" />
+                                <span>Lihat sebagai Klien</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => regenerateClientLink(lead.id)}
+                                className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold border border-amber-500/40 flex items-center space-x-1.5"
+                              >
+                                <span>🔄 Buat Ulang Link (Ganti Token)</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => revokeClientLink(lead.id)}
+                                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center space-x-1.5"
+                              >
+                                <span>🚫 Cabut Link Sekarang</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Metadata & Analytics Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/80 space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Hash Keamanan Token:</span>
+                        <strong className="text-teal-300 font-mono text-[11px] block truncate">{lead.clientLinkInfo.tokenHash}</strong>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/80 space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Terakhir Dilihat Klien:</span>
+                        <strong className="text-slate-100 font-medium block">{lead.clientLinkInfo.lastOpenedAt || 'Belum Pernah Dibuka'}</strong>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/80 space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Jumlah Akses Dilihat:</span>
+                        <strong className="text-teal-300 font-mono text-sm block">{lead.clientLinkInfo.viewCount || 0} Kali</strong>
+                      </div>
+                    </div>
+
+                    {/* Controlled Exception Setting: Client Action Required Banner */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <strong className="text-xs font-bold text-slate-200 block">Pengecualian Terkontrol: Penanda Tindakan Klien</strong>
+                          <span className="text-[11px] text-slate-400">Aktifkan untuk memberikan instruksi khusus bagi klien pada halaman pelacakan.</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(lead.clientLinkInfo.needsClientAction)}
+                          onChange={(e) => setClientActionNeeded(lead.id, e.target.checked)}
+                          className="w-5 h-5 rounded border-slate-600 text-teal-500 focus:ring-teal-500 bg-slate-950 cursor-pointer"
+                        />
+                      </div>
+
+                      {lead.clientLinkInfo.needsClientAction && (
+                        <div className="space-y-2 pt-2 border-t border-slate-800">
+                          <label className="block text-[11px] text-slate-300 font-semibold">
+                            Pesan Instruksi Untuk Klien:
+                          </label>
+                          <input
+                            type="text"
+                            defaultValue={lead.clientLinkInfo.clientActionMessage || 'Menunggu kelengkapan dokumen dari Anda.'}
+                            onBlur={(e) => setClientActionNeeded(lead.id, true, e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* TAB 2: JEJAK TAHAP DAN BUKTI SELESAI */}
             {activeTab === 'jejak_bukti' && (
               <div className="space-y-4">
@@ -696,8 +1119,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800 text-slate-300">
-                        {leadEvidences.map((ev) => (
-                          <tr key={ev.id} className="hover:bg-slate-800/40">
+                        {leadEvidences.map((ev, idx) => (
+                          <tr key={`${ev.id}-${idx}`} className="hover:bg-slate-800/40">
                             <td className="p-3 font-mono font-bold text-teal-400 text-[11px]">
                               {ev.lead_code || lead.lead_code || 'LEAD-00101'}
                             </td>
@@ -891,6 +1314,83 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                     </form>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB 5: E-SIGNATURE VERIFICATION & AUDIT TRAIL */}
+            {activeTab === 'esignature' && (
+              <div className="space-y-4 animate-fadeIn">
+                {/* Header Banner */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-500/40 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-300 font-bold">
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-slate-100 text-sm">
+                          Status Keabsahan Hukum & Tanda Tangan Digital (E-Signature)
+                        </h4>
+                        <p className="text-xs text-slate-300">
+                          Terverifikasi secara Kriptografis berdasarkan UU ITE No. 11/2008 Pasal 11 & KUHD Pasal 468
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/90 border border-emerald-400 text-emerald-300 text-xs font-mono font-bold shadow-[0_0_15px_rgba(16,185,129,0.35)]">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                      <span>AUTHENTICATED LEGAL E-SIGNATURE</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Digital Signature Pad Component */}
+                <DigitalSignaturePad
+                  signatoryName={currentUser.name}
+                  signatoryRole={
+                    currentUser.role === 'manager'
+                      ? 'Fleet & Operations Manager'
+                      : currentUser.role === 'reviewer'
+                      ? 'QA & Safety Compliance Lead Inspector'
+                      : 'Staff Logistik & PIC Operasional'
+                  }
+                  leadCode={lead.lead_code}
+                  noSuratJalan={lead.no_surat_jalan}
+                />
+
+                {/* Verified Signatories Log */}
+                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                  <h5 className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center space-x-2">
+                    <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                    <span>Daftar Pejabat Penandatangan Resmi Transaksi Ini</span>
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* PIC Signatory */}
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-xs">
+                      <span className="text-[10px] text-slate-400 uppercase font-mono block">1. Inisiasi & Pembuat Lead:</span>
+                      <strong className="text-slate-100 block">{lead.creator_name || 'Budi Santoso'}</strong>
+                      <span className="text-slate-400 text-[11px] block">Staff Operasional Lapangan</span>
+                      <span className="text-emerald-400 text-[10px] font-mono block pt-1 border-t border-slate-800">✓ System Digital Signed</span>
+                    </div>
+
+                    {/* QA Inspector */}
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-xs">
+                      <span className="text-[10px] text-slate-400 uppercase font-mono block">2. QA Safety Inspector:</span>
+                      <strong className="text-slate-100 block">{lead.reviewer_name || 'Wawan Setiawan, S.T.'}</strong>
+                      <span className="text-slate-400 text-[11px] block">QA & Compliance Auditor</span>
+                      <span className="text-emerald-400 text-[10px] font-mono block pt-1 border-t border-slate-800">✓ ISO 9001:2015 Approved</span>
+                    </div>
+
+                    {/* Operations Manager */}
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-xs">
+                      <span className="text-[10px] text-slate-400 uppercase font-mono block">3. Manager Penanggung Jawab:</span>
+                      <strong className="text-slate-100 block">{lead.manager_name || 'Probo Subagyo, M.M.'}</strong>
+                      <span className="text-slate-400 text-[11px] block">Fleet & Operations Manager</span>
+                      <span className="text-emerald-400 text-[10px] font-mono block pt-1 border-t border-slate-800">✓ Authorized Manager E-Seal</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1101,6 +1601,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
           </div>
         </div>
       )}
+
+      {/* Client Portal Preview Modal */}
+      <ClientPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        payload={lead.clientLinkInfo?.token ? (publicTrackingStore[lead.clientLinkInfo.token] || null) : null}
+      />
     </>
   );
 };

@@ -131,6 +131,10 @@ export interface Lead {
 
   // Fase 7: Operational Field Sub-stages
   operationalSubStages?: OperationalSubStageItem[];
+
+  // Fase 8: Public Client Tracking Link (Sanitized & Monotonic)
+  clientLinkInfo?: ClientTrackingLinkInfo;
+  highestClientStageOrder?: number;
   deleted_by?: string;
   deleted_by_name?: string;
   deletion_reason?: string;
@@ -320,7 +324,10 @@ export type OperationalSubStageStatus = 'belum' | 'berjalan' | 'selesai';
 export interface OperationalSubStageItem {
   id: string;
   stepNumber: number; // 1 to 5
+  stepOrder?: number;
   title: string;
+  description?: string;
+  targetHours?: number;
   status: OperationalSubStageStatus;
   startTime?: string;
   endTime?: string;
@@ -342,5 +349,61 @@ export interface SensitiveMaskState {
   [leadId: string]: {
     [fieldName: string]: boolean; // true = revealed for current session
   };
+}
+
+// ============================================================================
+// FASE 8 PUBLIC CLIENT LINK & WHITELIST TYPES
+// ============================================================================
+
+export interface ClientStageMappingConfig {
+  id: string;
+  order: number;
+  label: string;
+  description: string;
+  iconType: 'truck' | 'ship' | 'depo' | 'dock' | 'doc' | 'flag';
+  triggerInternalStatuses: string[];
+}
+
+export interface ClientTrackingLinkInfo {
+  token: string;
+  tokenHash: string;
+  createdAt: string;
+  createdBy: string;
+  expiresAt: string;
+  isActive: boolean;
+  viewCount: number;
+  lastOpenedAt?: string;
+  maxDaysAfterClosed: number;
+  needsClientAction?: boolean;
+  clientActionMessage?: string;
+}
+
+export interface PublicTrackingPayload {
+  token: string;
+  displayRefNo: string;
+  clientCompany: string;
+  cargoType: string;
+  ruteAsal: string;
+  ruteTujuan: string;
+  clientStages: {
+    id: string;
+    order: number;
+    label: string;
+    description: string;
+    status: 'selesai' | 'berjalan' | 'berikutnya';
+    iconType: string;
+  }[];
+  activeStageIndex: number;
+  activeStageLabel: string;
+  highestReachedStageOrder: number;
+  finalEtaRange: string;
+  lastUpdatedAt: string;
+  companyContact: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  needsClientAction: boolean;
+  clientActionText?: string;
 }
 

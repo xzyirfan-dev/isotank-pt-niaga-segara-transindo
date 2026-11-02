@@ -1,5 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { X, PlusCircle, AlertCircle, CheckCircle2, Ship, Anchor, Truck, AlertTriangle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  X, 
+  PlusCircle, 
+  AlertCircle, 
+  CheckCircle2, 
+  Ship, 
+  Truck, 
+  AlertTriangle, 
+  RefreshCw, 
+  Upload, 
+  ChevronDown, 
+  Building2, 
+  MapPin, 
+  Sparkles
+} from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 interface NewLeadModalProps {
@@ -22,6 +36,9 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
   const [noPlatTruk, setNoPlatTruk] = useState('B 9842 UFX');
   const [transportDocName, setTransportDocName] = useState('Surat_Penunjukan_Transporter_SegaraLogistik.pdf');
 
+  // Active dropdown popover key ('transportVendor' | 'transportDoc' | 'shippingCompany' | 'vesselTicketDoc' | 'muatan' | null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
   // Inter-Island Sea Freight (Kapal Kargo / Ro-Ro)
   const [isInterIsland, setIsInterIsland] = useState<boolean>(false);
   const [shippingCompany, setShippingCompany] = useState<string>('PT Pelayaran Meratus Line');
@@ -41,6 +58,8 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const modalRef = useRef<HTMLDivElement>(null);
+
   // Find managers
   const managers = users.filter(u => u.role === 'manager' || u.role === 'admin');
 
@@ -49,6 +68,17 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
       setManagerId(managers[0].id);
     }
   }, [managers, managerId]);
+
+  // Click outside to close active dropdown popovers
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Escape key handler to close modal
   useEffect(() => {
@@ -146,51 +176,59 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-auto max-h-[90vh] flex flex-col">
+      <div 
+        ref={modalRef}
+        className="w-full max-w-3xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-auto max-h-[92vh] flex flex-col"
+      >
         
-        {/* Header */}
-        <div className="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between shrink-0">
-          <div className="flex items-center space-x-2">
-            <PlusCircle className="w-5 h-5 text-teal-400" />
-            <h3 className="font-bold text-slate-100 text-sm">Buat Lead Transaksi Baru & Penunjukan Transporter (Stage 1)</h3>
+        {/* Modal Header */}
+        <div className="px-5 py-4 bg-slate-800/90 border-b border-slate-700/90 flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400">
+              <PlusCircle className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-100 text-sm tracking-wide">Inisiasi Lead Transaksi Baru & Penunjukan Transporter</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Stage 1 Operational Ingestion & Vendor Assignment</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-            title="Tutup Modal"
+            className="p-1.5 rounded-xl hover:bg-slate-700/80 text-slate-400 hover:text-white transition-colors"
+            title="Tutup Modal (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-4 overflow-y-auto custom-scrollbar">
           {errorMsg && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center space-x-2.5">
+              <AlertCircle className="w-4.5 h-4.5 shrink-0" />
+              <span className="font-medium">{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs flex items-center space-x-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{successMsg}</span>
+            <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs flex items-center space-x-2.5">
+              <CheckCircle2 className="w-4.5 h-4.5 shrink-0" />
+              <span className="font-medium">{successMsg}</span>
             </div>
           )}
 
           {/* Real-time Duplicate Detection Banner */}
           {duplicateStatus.isDuplicate && (
-            <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-start space-x-2.5 animate-fadeIn">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-start space-x-2.5">
+              <AlertTriangle className="w-4.5 h-4.5 text-amber-400 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="font-bold flex items-center justify-between text-amber-300">
                   <span>Deteksi Duplikasi Sistem ({duplicateStatus.field})</span>
@@ -201,7 +239,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                       className="text-[11px] font-bold text-teal-400 hover:text-teal-300 flex items-center space-x-1 underline"
                     >
                       <RefreshCw className="w-3 h-3" />
-                      <span>Acak Ulang No. SJ</span>
+                      <span>Acak No. SJ Baru</span>
                     </button>
                   )}
                 </div>
@@ -209,7 +247,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                   {duplicateStatus.message}
                 </p>
                 {duplicateStatus.existingLead && (
-                  <div className="mt-1.5 p-2 rounded-lg bg-slate-900/70 border border-amber-500/20 text-[10px] text-slate-300 font-mono">
+                  <div className="mt-1.5 p-2 rounded-lg bg-slate-900/80 border border-amber-500/20 text-[10px] text-slate-300 font-mono">
                     <span className="text-amber-400 font-bold">{duplicateStatus.existingLead.lead_code}</span>: {duplicateStatus.existingLead.client_company} · Unit: {duplicateStatus.existingLead.asset_code} · Status: <span className="uppercase text-teal-300">{duplicateStatus.existingLead.status}</span>
                   </div>
                 )}
@@ -217,107 +255,251 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
             </div>
           )}
 
-          {/* Section 1: Informasi Klien & Transaksi */}
-          <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/80 space-y-3">
-            <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center justify-between">
-              <span>1. Data Klien Perusahaan & Transaksi</span>
-              <span className="text-[10px] text-slate-400">Step 1 Inisiasi</span>
+          {/* SECTION 1: INFORMASI KLIEN & TRANSAKSI */}
+          <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Building2 className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                  1. Data Klien Perusahaan & Transaksi
+                </span>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-slate-700/80 text-slate-300 text-[10px] font-mono font-semibold">
+                STEP 1 INISIASI
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {/* Client Company Name */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Nama Perusahaan Klien / Pemilik Muatan:</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Nama Perusahaan Klien / Pemilik Muatan:
+                </label>
                 <input
                   type="text"
                   value={clientCompany}
                   onChange={(e) => setClientCompany(e.target.value)}
                   placeholder="Contoh: PT Petrokimia Utama Indonesia"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
 
               {/* No Surat Jalan */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  No. Surat Jalan <span className="text-teal-400">(Unik)</span>:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-300">
+                    No. Surat Jalan <span className="text-teal-400 font-semibold">(Unik)</span>:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setNoSuratJalan(generateAutoSJ())}
+                    className="text-[10px] font-bold text-teal-400 hover:text-teal-300 flex items-center space-x-1 px-1.5 py-0.5 rounded hover:bg-teal-500/10 transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Acak No. SJ</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={noSuratJalan}
                   onChange={(e) => setNoSuratJalan(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
             </div>
           </div>
 
-          {/* Section 2: Penunjukan Mitra Penyedia Truk Transport & Driver */}
-          <div className="p-3.5 rounded-xl bg-teal-500/5 border border-teal-500/30 space-y-3">
-            <div className="text-xs font-bold text-teal-300 uppercase tracking-wider flex items-center justify-between">
-              <span>2. Pencarian & Penunjukan Mitra Transporter / Truk</span>
-              <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px]">Penting Untuk Persetujuan</span>
+          {/* SECTION 2: TRANSPORTER & DRIVER (UNIFIED SMART INPUTS) */}
+          <div className="p-4 rounded-2xl bg-teal-950/20 border border-teal-500/30 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Truck className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
+                  2. Pencarian & Penunjukan Mitra Transporter / Truk
+                </span>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-bold border border-teal-500/30">
+                PENTING UNTUK STAGE 2
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Transport Vendor Company */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Nama Perusahaan Penyedia Truk / Vendor:</label>
-                <input
-                  type="text"
-                  value={transportVendorName}
-                  onChange={(e) => setTransportVendorName(e.target.value)}
-                  placeholder="Contoh: PT Segara Logistik Express"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                  required
-                />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              
+              {/* Transport Vendor Company - UNIFIED SMART INPUT */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  Nama Perusahaan Penyedia Truk / Vendor:
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={transportVendorName}
+                    onChange={(e) => setTransportVendorName(e.target.value)}
+                    placeholder="Contoh: PT Segara Logistik Express"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === 'transportVendor' ? null : 'transportVendor')}
+                    className="absolute right-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-teal-300 text-[11px] font-bold flex items-center space-x-1 transition-colors border border-teal-500/30 cursor-pointer"
+                  >
+                    <span>🚛 Preset</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === 'transportVendor' ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Downlist Popover */}
+                  {openDropdown === 'transportVendor' && (
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-slate-800 border border-teal-500/40 rounded-xl shadow-2xl overflow-hidden py-1 divide-y divide-slate-700/60 animate-fadeIn">
+                      {[
+                        { label: 'PT Segara Logistik Express', desc: 'Vendor Utama NST - Tanker & B3 Transport' },
+                        { label: 'PT Transporindo Agung Sejahtera', desc: 'Armada Truk Trailer & Isotank Jawa-Bali' },
+                        { label: 'PT Dunex Logistics Indonesia', desc: 'Spesialis Angkutan Bahan Kimia Cair' },
+                        { label: 'PT Cipta Krida Bahari (CKB)', desc: 'Penyedia Logistik Multimoda Tanker' }
+                      ].map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.label}
+                          onClick={() => {
+                            setTransportVendorName(opt.label);
+                            setOpenDropdown(null);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 hover:bg-teal-500/15 text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                            transportVendorName === opt.label ? 'bg-teal-500/20 text-teal-300 font-bold' : 'text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-teal-300">{opt.label}</span>
+                            {transportVendorName === opt.label && <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />}
+                          </div>
+                          <span className="text-[10px] text-slate-400 truncate">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Driver Name */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Nama Supir / Pengemudi Truk:</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Nama Supir / Pengemudi Truk:
+                </label>
                 <input
                   type="text"
                   value={namaSupir}
                   onChange={(e) => setNamaSupir(e.target.value)}
                   placeholder="Contoh: Bambang Susanto (SIM B2 Umum)"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
 
               {/* Truck License Plate */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Nomor Plat Nomor Truk Pengangkut:</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Nomor Plat Truk Pengangkut:
+                </label>
                 <input
                   type="text"
                   value={noPlatTruk}
                   onChange={(e) => setNoPlatTruk(e.target.value)}
                   placeholder="Contoh: B 9842 UFX"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
 
-              {/* Transport Legal Attachment Document */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Dokumen Lampiran Absah (STNK / SIM / Surat Penunjukan):</label>
-                <input
-                  type="text"
-                  value={transportDocName}
-                  onChange={(e) => setTransportDocName(e.target.value)}
-                  placeholder="Nama Berkas Dokumen (pdf/jpg)"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                  required
-                />
+              {/* Legal Document Attachment - UNIFIED DUAL ACTION INPUT */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">
+                    Dokumen Lampiran Absah (STNK / SIM / Penunjukan):
+                  </label>
+                  {transportDocName && (
+                    <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px] font-bold border border-teal-500/40 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-teal-400" /> TERLAMPIR
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={transportDocName}
+                    onChange={(e) => setTransportDocName(e.target.value)}
+                    placeholder="Nama Berkas Dokumen (pdf/jpg)"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-44 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none font-mono transition-all"
+                    required
+                  />
+
+                  {/* Integrated Action Buttons */}
+                  <div className="absolute right-1 flex items-center space-x-1">
+                    <label className="px-2 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 text-[11px] font-bold flex items-center space-x-1 cursor-pointer transition-colors shadow-sm">
+                      <Upload className="w-3 h-3 text-slate-950" />
+                      <span>Unggah</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setTransportDocName(file.name);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdown(openDropdown === 'transportDoc' ? null : 'transportDoc')}
+                      className="px-2 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-650 text-teal-300 text-[11px] font-bold flex items-center space-x-1 border border-teal-500/30 transition-colors cursor-pointer"
+                    >
+                      <span>📄 Preset</span>
+                      <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === 'transportDoc' ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+
+                  {/* Downlist Popover */}
+                  {openDropdown === 'transportDoc' && (
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-slate-800 border border-teal-500/40 rounded-xl shadow-2xl overflow-hidden py-1 divide-y divide-slate-700/60 animate-fadeIn">
+                      {[
+                        { label: 'Surat Penunjukan Transporter', val: 'Surat_Penunjukan_Transporter_SegaraLogistik.pdf', desc: 'Resmi penunjukan vendor PT Segara Logistik' },
+                        { label: 'STNK Truk & SIM B2 Umum', val: 'STNK_Truk_B9842UFX_Dan_SIM_B2.pdf', desc: 'Identitas legalitas fisik kendaraan & pengemudi' },
+                        { label: 'Kontrak Kemitraan Transport 2026', val: 'Kontrak_Kemitraan_Transport_2026.pdf', desc: 'Perjanjian kerjasama pengangkutan B2B' },
+                        { label: 'Izin Operasional Transporter B3', val: 'Izin_Transporter_B3_KemenLHK.pdf', desc: 'Lisensi izin pengangkutan bahan berbahaya KemenLHK' }
+                      ].map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.val}
+                          onClick={() => {
+                            setTransportDocName(opt.val);
+                            setOpenDropdown(null);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 hover:bg-teal-500/15 text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                            transportDocName === opt.val ? 'bg-teal-500/20 text-teal-300 font-bold' : 'text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-teal-300">{opt.label}</span>
+                            {transportDocName === opt.val && <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono truncate">{opt.val}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
+
             </div>
           </div>
 
-          {/* Section 3: Pencarian & Pemesanan Jasa Kapal Kargo (Rute Luar Pulau) */}
-          <div className="p-3.5 rounded-xl bg-cyan-500/5 border border-cyan-500/30 space-y-3">
+          {/* SECTION 3: PENGIRIMAN LUAR PULAU (KAPAL KARGO / RO-RO) */}
+          <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-3.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center space-x-2">
                 <Ship className="w-4 h-4 text-cyan-400" />
@@ -326,49 +508,79 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                 </span>
               </div>
 
-              <label className="flex items-center space-x-2 cursor-pointer bg-slate-900/80 px-3 py-1 rounded-xl border border-cyan-500/40">
+              <label className="flex items-center space-x-2 cursor-pointer bg-slate-800/90 hover:bg-slate-800 px-3 py-1 rounded-xl border border-cyan-500/40 transition-colors">
                 <input
                   type="checkbox"
                   checked={isInterIsland}
                   onChange={(e) => setIsInterIsland(e.target.checked)}
-                  className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 bg-slate-800 border-slate-600"
+                  className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 bg-slate-900 border-slate-700"
                 />
                 <span className="text-xs font-bold text-cyan-300">
-                  {isInterIsland ? 'Aktif: Rute Luar Pulau' : 'Aktifkan Bila Luar Pulau'}
+                  {isInterIsland ? '✓ Aktif: Rute Luar Pulau' : 'Aktifkan Bila Luar Pulau'}
                 </span>
               </label>
             </div>
 
             {isInterIsland ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-cyan-500/20 animate-fadeIn">
-                {/* Shipping Company / Perusahaan Jasa Kapal */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2 border-t border-cyan-500/20">
+                
+                {/* Shipping Company - UNIFIED SMART INPUT */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-300">
                     Nama Perusahaan Jasa Kapal Kargo / Ro-Ro:
                   </label>
-                  <input
-                    type="text"
-                    value={shippingCompany}
-                    onChange={(e) => setShippingCompany(e.target.value)}
-                    placeholder="Contoh: PT Pelayaran Meratus Line / PT ASDP / PT DLU"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
-                    required={isInterIsland}
-                  />
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    {['PT Pelayaran Meratus Line', 'PT Dharma Lautan Utama', 'PT ASDP Ferry', 'PT Samudera Indonesia'].map((preset) => (
-                      <button
-                        type="button"
-                        key={preset}
-                        onClick={() => setShippingCompany(preset)}
-                        className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                      >
-                        {preset.replace('PT ', '')}
-                      </button>
-                    ))}
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={shippingCompany}
+                      onChange={(e) => setShippingCompany(e.target.value)}
+                      placeholder="Contoh: PT Pelayaran Meratus Line"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
+                      required={isInterIsland}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdown(openDropdown === 'shippingCompany' ? null : 'shippingCompany')}
+                      className="absolute right-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold flex items-center space-x-1 border border-cyan-500/30 transition-colors cursor-pointer"
+                    >
+                      <span>🚢 Preset</span>
+                      <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === 'shippingCompany' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Popover */}
+                    {openDropdown === 'shippingCompany' && (
+                      <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-slate-800 border border-cyan-500/40 rounded-xl shadow-2xl overflow-hidden py-1 divide-y divide-slate-700/60 animate-fadeIn">
+                        {[
+                          { label: 'PT Pelayaran Meratus Line', desc: 'Layanan Kapal Container & Kargo Antar-Pulau' },
+                          { label: 'PT Dharma Lautan Utama (DLU)', desc: 'Kapal Ro-Ro Penyeberangan Fast Logistics' },
+                          { label: 'PT ASDP Indonesia Ferry', desc: 'BUMN Penyeberangan Utama Indonesia' },
+                          { label: 'PT Samudera Indonesia', desc: 'Pelayaran Kargo Industri & Multimoda' },
+                          { label: 'PT Salam Pacific Indonesia Lines (SPIL)', desc: 'Armada Petikemas & Tanker Laut' }
+                        ].map((opt) => (
+                          <button
+                            type="button"
+                            key={opt.label}
+                            onClick={() => {
+                              setShippingCompany(opt.label);
+                              setOpenDropdown(null);
+                            }}
+                            className={`w-full text-left px-3.5 py-2 hover:bg-cyan-500/15 text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                              shippingCompany === opt.label ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-cyan-300">{opt.label}</span>
+                              {shippingCompany === opt.label && <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />}
+                            </div>
+                            <span className="text-[10px] text-slate-400 truncate">{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Vessel Name / Nama Kapal */}
+                {/* Vessel Name */}
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
                     Nama Kapal Kargo / Ro-Ro Pengangkut:
@@ -377,38 +589,38 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                     type="text"
                     value={vesselName}
                     onChange={(e) => setVesselName(e.target.value)}
-                    placeholder="Contoh: KM Meratus Banjar / KMP Dharma Rucitra VII"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    placeholder="Contoh: KM Meratus Banjar"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
                     required={isInterIsland}
                   />
                 </div>
 
-                {/* Voyage Number / ID Perjalanan */}
+                {/* Voyage Number */}
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    No. Perjalanan / Voyage ID / Manifest ID:
+                    No. Voyage / Manifest ID:
                   </label>
                   <input
                     type="text"
                     value={voyageNumber}
                     onChange={(e) => setVoyageNumber(e.target.value)}
                     placeholder="Contoh: VOY-2026/088-SBY-BPN"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-cyan-300 focus:border-cyan-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-cyan-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
                     required={isInterIsland}
                   />
                 </div>
 
-                {/* Vessel Schedule / Jadwal Pelayaran */}
+                {/* Schedule */}
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Jadwal Pelayaran (ETD Keberangkatan & ETA Kedatangan):
+                    Jadwal Pelayaran (ETD Keberangkatan & ETA):
                   </label>
                   <input
                     type="text"
                     value={vesselSchedule}
                     onChange={(e) => setVesselSchedule(e.target.value)}
                     placeholder="Contoh: ETD: 02 Nov 18:00 WIB | ETA: 04 Nov 07:00 WITA"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
                     required={isInterIsland}
                   />
                 </div>
@@ -421,7 +633,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                     value={portOrigin}
                     onChange={(e) => setPortOrigin(e.target.value)}
                     placeholder="Contoh: Pelabuhan Tanjung Perak Surabaya"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
                   />
                 </div>
 
@@ -433,42 +645,112 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                     value={portDestination}
                     onChange={(e) => setPortDestination(e.target.value)}
                     placeholder="Contoh: Pelabuhan Semayang Balikpapan"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
                   />
                 </div>
 
-                {/* Vessel Booking Document / Ticket */}
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Lampiran Bukti Form Pemesanan / Tiket Jasa Kapal (PDF/JPG):
-                  </label>
-                  <input
-                    type="text"
-                    value={vesselTicketDocName}
-                    onChange={(e) => setVesselTicketDocName(e.target.value)}
-                    placeholder="Nama Berkas Tiket (Contoh: Tiket_Booking_Kapal_Meratus_VOY088.pdf)"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
-                    required={isInterIsland}
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Formulir pemesanan / tiket penyeberangan ini akan ditinjau dan diverifikasi oleh Manager Operasional pada Stage 2 Approval.
-                  </p>
+                {/* Vessel Booking Document / Ticket - UNIFIED DUAL ACTION INPUT */}
+                <div className="md:col-span-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-300">
+                      Lampiran Form Pemesanan / Tiket Jasa Kapal (PDF/JPG):
+                    </label>
+                    {vesselTicketDocName && (
+                      <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/40 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-cyan-400" /> TERLAMPIR
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={vesselTicketDocName}
+                      onChange={(e) => setVesselTicketDocName(e.target.value)}
+                      placeholder="Nama Berkas Tiket (pdf/jpg)"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-48 py-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none font-mono transition-all"
+                      required={isInterIsland}
+                    />
+
+                    {/* Integrated Action Buttons */}
+                    <div className="absolute right-1 flex items-center space-x-1">
+                      <label className="px-2 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[11px] font-bold flex items-center space-x-1 cursor-pointer transition-colors shadow-sm">
+                        <Upload className="w-3 h-3 text-slate-950" />
+                        <span>Unggah Tiket</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setVesselTicketDocName(file.name);
+                            }
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => setOpenDropdown(openDropdown === 'vesselTicketDoc' ? null : 'vesselTicketDoc')}
+                        className="px-2 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-650 text-cyan-300 text-[11px] font-bold flex items-center space-x-1 border border-cyan-500/30 transition-colors cursor-pointer"
+                      >
+                        <span>🎫 Preset</span>
+                        <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === 'vesselTicketDoc' ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Popover */}
+                    {openDropdown === 'vesselTicketDoc' && (
+                      <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-slate-800 border border-cyan-500/40 rounded-xl shadow-2xl overflow-hidden py-1 divide-y divide-slate-700/60 animate-fadeIn">
+                        {[
+                          { label: 'Tiket Booking Kapal Meratus VOY088', val: 'Tiket_Booking_Kapal_Meratus_VOY088.pdf', desc: 'Bukti resmi konfirmasi slot kapal kargo Meratus' },
+                          { label: 'Form Pemesanan Kapal Dharma Rucitra', val: 'Form_Pemesanan_Kapal_DharmaRucitra.pdf', desc: 'Resi booking truk & Isotank Ro-Ro DLU' },
+                          { label: 'Manifes Kargo Pelayaran ASDP', val: 'Manifest_Kargo_Pelayaran_ASDP.pdf', desc: 'Manifes sah penyeberangan armada kapal ASDP' },
+                          { label: 'Bill of Lading (B/L) Sea Freight', val: 'Bill_of_Lading_SeaFreight_2026.pdf', desc: 'Dokumen kepemilikan kargo pelayaran laut' }
+                        ].map((opt) => (
+                          <button
+                            type="button"
+                            key={opt.val}
+                            onClick={() => {
+                              setVesselTicketDocName(opt.val);
+                              setOpenDropdown(null);
+                            }}
+                            className={`w-full text-left px-3.5 py-2 hover:bg-cyan-500/15 text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                              vesselTicketDocName === opt.val ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-cyan-300">{opt.label}</span>
+                              {vesselTicketDocName === opt.val && <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono truncate">{opt.val}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
               </div>
             ) : (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 leading-relaxed">
                 Centang opsi di atas apabila rute pengiriman melintasi pulau (misal: Jawa ➔ Kalimantan, Sumatera, Sulawesi, dll.) untuk mencantumkan data kapal kargo & tiket penyeberangan.
               </p>
             )}
           </div>
 
-          {/* Section 4: Rute, Asset, Muatan & SLA */}
-          <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/80 space-y-3">
-            <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-              4. Detail Rute, Unit Isotank & Target SLA
+          {/* SECTION 4: DETAIL RUTE, UNIT ISOTANK & TARGET SLA */}
+          <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-3.5">
+            <div className="flex items-center space-x-2">
+              <MapPin className="w-4 h-4 text-slate-300" />
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                4. Detail Rute, Unit Isotank & Target SLA
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              
               {/* Asset Isotank Selection */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -477,7 +759,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                 <select
                   value={assetId}
                   onChange={(e) => setAssetId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 >
                   <option value="">-- Pilih Unit Isotank --</option>
@@ -496,17 +778,60 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                 </select>
               </div>
 
-              {/* Muatan Chemical */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Spesifikasi Muatan Chemical:</label>
-                <input
-                  type="text"
-                  value={muatan}
-                  onChange={(e) => setMuatan(e.target.value)}
-                  placeholder="Contoh: Caustic Soda Liquid 48%"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                  required
-                />
+              {/* Chemical Cargo - UNIFIED SMART INPUT */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  Spesifikasi Muatan Chemical / Liquid:
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={muatan}
+                    onChange={(e) => setMuatan(e.target.value)}
+                    placeholder="Contoh: Caustic Soda Liquid 48%"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === 'muatan' ? null : 'muatan')}
+                    className="absolute right-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-teal-300 text-[11px] font-bold flex items-center space-x-1 border border-teal-500/30 transition-colors cursor-pointer"
+                  >
+                    <span>🧪 Preset</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === 'muatan' ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Popover */}
+                  {openDropdown === 'muatan' && (
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden py-1 divide-y divide-slate-700/60 animate-fadeIn">
+                      {[
+                        { label: 'Caustic Soda Liquid 48%', desc: 'Kimia Industri B3 Hazard Class 8' },
+                        { label: 'Sulfuric Acid (H2SO4) 98%', desc: 'Asam Sulfat Pekat Industri Petrokimia' },
+                        { label: 'Hydrochloric Acid (HCl) 32%', desc: 'Asam Klorida Pembersihan Metal' },
+                        { label: 'Food Grade Liquid Sugar Syrup', desc: 'Sirup Gula Cair Industri Makanan & Minuman' },
+                        { label: 'Crude Palm Oil (CPO Liquid)', desc: 'Minyak Kelapa Sawit Cair Non-Hazardous' }
+                      ].map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.label}
+                          onClick={() => {
+                            setMuatan(opt.label);
+                            setOpenDropdown(null);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 hover:bg-slate-700 text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                            muatan === opt.label ? 'bg-teal-500/20 text-teal-300 font-bold' : 'text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-teal-300">{opt.label}</span>
+                            {muatan === opt.label && <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />}
+                          </div>
+                          <span className="text-[10px] text-slate-400 truncate">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Asal */}
@@ -517,7 +842,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                   value={asal}
                   onChange={(e) => setAsal(e.target.value)}
                   placeholder="Contoh: Depo Utama Tuban"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
@@ -530,7 +855,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                   value={tujuan}
                   onChange={(e) => setTujuan(e.target.value)}
                   placeholder="Contoh: Kawasan Industri Petrokimia Gresik"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
@@ -542,7 +867,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                   type="datetime-local"
                   value={targetAt}
                   onChange={(e) => setTargetAt(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                   required
                 />
               </div>
@@ -553,7 +878,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                 <select
                   value={managerId}
                   onChange={(e) => setManagerId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                 >
                   {managers.map(m => (
                     <option key={m.id} value={m.id}>{m.name} ({m.department})</option>
@@ -564,23 +889,29 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700 text-[11px] text-slate-400">
-            Karyawan Pembuat & PIC: <strong className="text-slate-200">{currentUser.name}</strong> ({currentUser.department})
+          {/* User Info Bar */}
+          <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/80 text-[11px] text-slate-400 flex items-center justify-between">
+            <div>
+              Karyawan Pembuat & PIC: <strong className="text-slate-200">{currentUser.name}</strong> ({currentUser.department})
+            </div>
+            <span className="text-[10px] text-teal-400 font-mono">ISO 9001 Audit Ready</span>
           </div>
 
+          {/* Action Buttons */}
           <div className="flex items-center justify-end space-x-3 pt-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+              className="px-4 py-2.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 rounded-xl shadow-md shadow-teal-500/20 transition-colors"
+              className="px-5 py-2.5 text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 rounded-xl shadow-lg shadow-teal-500/20 transition-all cursor-pointer flex items-center space-x-1.5"
             >
-              Terbitkan Lead & Kemitraan Transporter
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Terbitkan Lead Transaksi & Penunjukan Transporter</span>
             </button>
           </div>
         </form>

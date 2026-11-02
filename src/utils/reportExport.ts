@@ -568,3 +568,722 @@ export const downloadCorporatePDF = (
   const fileName = `${filenamePrefix}_${cleanDate}.pdf`;
   doc.save(fileName);
 };
+
+/**
+ * Downloads a formal individual PDF document (Surat Jalan Sah & BASTP) for a single Lead
+ * complete with Kop Surat PT Niaga Segara Trasindo, NPWP/NIB, ISO 9001 compliance,
+ * shipment specs, multimodal transport info, SLA status, and 3-column TTD Pejabat.
+ */
+export const downloadSingleLeadOfficialPDF = (lead: any, currentUser?: any) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+  const marginX = 12;
+  const printableWidth = pageWidth - (marginX * 2); // 186 mm
+
+  const todayDateStr = new Date().toLocaleDateString('id-ID', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  }); // e.g., "03 November 2026"
+
+  const timeNowStr = `${todayDateStr} pukul ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
+
+  // 1. Watermark (Faint slate-100 color)
+  try {
+    doc.saveGraphicsState();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(241, 245, 249); // slate-100
+    const watermarkText = `OFFICIAL DOKUMEN SAH · ${lead.no_surat_jalan} · PT NIAGA SEGARA TRASINDO · ${timeNowStr}`;
+    doc.text(watermarkText, pageWidth / 2, pageHeight / 2, {
+      align: 'center',
+      angle: 35,
+    });
+    doc.restoreGraphicsState();
+  } catch (e) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(241, 245, 249);
+    doc.text(`OFFICIAL DOKUMEN SAH - ${lead.no_surat_jalan}`, pageWidth / 2, pageHeight / 2, { align: 'center' });
+  }
+
+  // 2. KOP SURAT PERUSAHAAN (TOP)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text('PT NIAGA SEGARA TRASINDO', marginX, 11.5);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(13, 148, 136); // teal-600
+  doc.text('DIVISI OPERASIONAL LOGISTIK ISOTANK CHEMICAL & MULTIMODA', marginX, 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Graha Segara Lt. 4, Jl. Perak Timur No. 512, Pelabuhan Tanjung Perak, Surabaya 60165', marginX, 19.5);
+  doc.text('Telp: (031) 329-8877 | Fax: (031) 329-8878 | Email: operational@niagasegara.co.id | Web: www.niagasegara.co.id', marginX, 23);
+  doc.text('NPWP: 01.884.992.3-604.000 | NIB: 9120004812391 | Izin Transporter B3: SK-MENLHK/089/2023 | ISO 9001:2015', marginX, 26.5);
+
+  // Verification Badge - TOP RIGHT OF KOP SURAT (ABOVE DOUBLE LINE)
+  doc.setDrawColor(13, 148, 136);
+  doc.setFillColor(240, 253, 250);
+  doc.roundedRect(pageWidth - marginX - 38, 9, 38, 12, 1, 1, 'FD');
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(13, 148, 136);
+  doc.text('[ VERIFIED SAH ]', pageWidth - marginX - 19, 13, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(30, 41, 59);
+  doc.text('ISO 9001:2015 SYSTEM', pageWidth - marginX - 19, 17, { align: 'center' });
+
+  // Dual Line Separator
+  doc.setDrawColor(13, 148, 136);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, 29, pageWidth - marginX, 29);
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(0.25);
+  doc.line(marginX, 30, pageWidth - marginX, 30);
+
+  // 3. DOCUMENT TITLE (UNIMPEDED FULL WIDTH)
+  let currentY = 36;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text('BERITA ACARA SERAH TERIMA & DOKUMEN SAH SURAT JALAN', pageWidth / 2, currentY, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.2);
+  doc.setTextColor(71, 85, 105);
+  const docRegNo = `Nomor Dokumen: NST/BASTP/2026/${lead.lead_code || 'LEAD-00101'}/${lead.no_surat_jalan.replace(/\//g, '-')}`;
+  doc.text(docRegNo, pageWidth / 2, currentY + 4.5, { align: 'center' });
+
+  currentY += 11;
+
+  // 4. GENERAL TRANSACTION METADATA TABLE
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('I. INFORMASI IDENTITAS TRANSAKSI & KLIEN', marginX, currentY);
+  currentY += 2.5;
+
+  const leadIdDisplay = lead.lead_code || lead.id;
+  const isClosed = lead.status === 'closed';
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: marginX, right: marginX },
+    tableWidth: printableWidth,
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.5, textColor: [30, 41, 59], lineColor: [203, 213, 225], lineWidth: 0.15 },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 },
+    body: [
+      [
+        { content: 'ID Lead Transaksi:', fontStyle: 'bold' }, leadIdDisplay,
+        { content: 'Nomor Surat Jalan:', fontStyle: 'bold' }, lead.no_surat_jalan
+      ],
+      [
+        { content: 'Perusahaan Klien:', fontStyle: 'bold' }, lead.client_company || 'PT Petrokimia Utama Indonesia',
+        { content: 'Unit Isotank / Aset:', fontStyle: 'bold' }, lead.asset_code
+      ],
+      [
+        { content: 'Jenis Muatan Bahan:', fontStyle: 'bold' }, lead.muatan,
+        { content: 'Volume / Tonase:', fontStyle: 'bold' }, `${lead.volume_tonase || 24} Ton`
+      ],
+      [
+        { content: 'Rute Pengiriman:', fontStyle: 'bold' }, `${lead.asal} -> ${lead.tujuan}`,
+        { content: 'Target Ketibaan (SLA):', fontStyle: 'bold' }, new Date(lead.target_at).toLocaleString('id-ID')
+      ],
+      [
+        { content: 'Status Tahap Operasional:', fontStyle: 'bold' }, `Tahap ${lead.current_step} dari 8 (${isClosed ? 'CLOSED / SELESAI' : 'DALAM PROSES'})`,
+        { content: 'Waktu Cetak Dokumen:', fontStyle: 'bold' }, timeNowStr
+      ]
+    ]
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 5. MULTIMODAL LOGISTICS & VENDOR DETAILS TABLE
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('II. SPECIFIKASI OPERASIONAL LOGISTIK & ANGKUTAN MULTIMODA', marginX, currentY);
+  currentY += 2.5;
+
+  const transportVendor = lead.transport_vendor_name || 'PT Segara Logistik Express';
+  const driverName = lead.nama_supir || 'Bambang Susanto (SIM B2 Umum)';
+  const truckPlate = lead.no_plat_truk || 'B 9842 UFX';
+  const seaFreightStatus = lead.is_inter_island
+    ? `YA (${lead.shipping_company || 'Pelayaran Laut'} - Kapal ${lead.vessel_name || '-'} VOY: ${lead.voyage_number || '-'})`
+    : 'TIDAK (Pengiriman Darat Direct)';
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: marginX, right: marginX },
+    tableWidth: printableWidth,
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.5, textColor: [30, 41, 59], lineColor: [203, 213, 225], lineWidth: 0.15 },
+    headStyles: { fillColor: [13, 148, 136], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 },
+    body: [
+      [
+        { content: 'Mitra Penyedia Truk:', fontStyle: 'bold' }, transportVendor,
+        { content: 'Dokumen STNK / SIM:', fontStyle: 'bold' }, lead.transport_doc_name || 'Penunjukan_Transporter_Sah.pdf'
+      ],
+      [
+        { content: 'Nama Supir / Pengemudi:', fontStyle: 'bold' }, driverName,
+        { content: 'No. Plat Nomor Truk:', fontStyle: 'bold' }, truckPlate
+      ],
+      [
+        { content: 'Pengangkutan Kapal Laut:', fontStyle: 'bold' }, seaFreightStatus,
+        { content: 'Tiket Booking Kapal:', fontStyle: 'bold' }, lead.vessel_ticket_doc_name || '-'
+      ],
+      [
+        { content: 'Petugas PIC Pembuat:', fontStyle: 'bold' }, lead.creator_name || lead.pic_name || 'Budi Santoso',
+        { content: 'Manager Penanggung Jawab:', fontStyle: 'bold' }, lead.manager_name || 'Probo Subagyo, M.M.'
+      ]
+    ]
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 6. PROOF OF DELIVERY & BASTP STATUS TABLE
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('III. STATUS PENYERAHAN & BERITA ACARA SERAH TERIMA (BASTP)', marginX, currentY);
+  currentY += 2.5;
+
+  const bastpDoc = lead.final_delivery_doc_name || 'BASTP_Bukti_Ketibaan_Terverifikasi.pdf';
+  const receiverName = lead.final_delivery_received_by || 'Petugas Gudang / Penerima Lokasi';
+  const deliveryTime = lead.final_delivery_date || (isClosed ? 'Telah Tiba & Ditandatangani' : 'Dalam Perjalanan Ke Lokasi');
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: marginX, right: marginX },
+    tableWidth: printableWidth,
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.5, textColor: [30, 41, 59], lineColor: [203, 213, 225], lineWidth: 0.15 },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 },
+    body: [
+      [
+        { content: 'Status BASTP Serah Terima:', fontStyle: 'bold' }, isClosed || lead.final_delivery_doc_name ? 'TERVERIFIKASI ABSAH (LENGKAP)' : 'PROSES OPERASIONAL BERJALAN',
+        { content: 'Nama Berkas BASTP:', fontStyle: 'bold' }, bastpDoc
+      ],
+      [
+        { content: 'Penerima di Lokasi Tujuan:', fontStyle: 'bold' }, receiverName,
+        { content: 'Waktu / Tanggal Kedatangan:', fontStyle: 'bold' }, deliveryTime
+      ],
+      [
+        { content: 'Lokasi / Posisi Terakhir:', fontStyle: 'bold' }, lead.current_location_note || `Depo / Lokasi Rute ${lead.tujuan}`,
+        { content: 'Catatan Pengesahan:', fontStyle: 'bold' }, 'Mutu & Muatan Kemasan Dalam Kondisi Baik dan Segel Utuh.'
+      ]
+    ]
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 8;
+
+  // 7. LEMBAR PENGESAHAN DOKUMEN (3-KOLOM TTD PEJABAT RESMI)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text('IV. LEMBAR PENGESAHAN DOKUMEN RESMI PT NIAGA SEGARA TRASINDO', marginX, currentY);
+  currentY += 3;
+
+  const boxHeight = 42;
+  const colGap = 4;
+  const colBoxWidth = (printableWidth - (colGap * 2)) / 3;
+
+  // Box 1: Disiapkan Oleh
+  const box1X = marginX;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(box1X, currentY, colBoxWidth, boxHeight, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Disiapkan Oleh (PIC / Pembuat):', box1X + (colBoxWidth / 2), currentY + 4.5, { align: 'center' });
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(100, 116, 139);
+  doc.text('[VERIFIKASI SISTEM ELEKTRONIK]', box1X + (colBoxWidth / 2), currentY + 8, { align: 'center' });
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(5.2);
+  doc.setTextColor(148, 163, 184);
+  doc.text('( Ruang Tanda Tangan / TTD & Stempel )', box1X + (colBoxWidth / 2), currentY + 18, { align: 'center' });
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(box1X + 8, currentY + 25, box1X + colBoxWidth - 8, currentY + 25);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(lead.creator_name || lead.pic_name || 'Budi Santoso', box1X + (colBoxWidth / 2), currentY + 29, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Staff Logistik & Operasional Lapangan', box1X + (colBoxWidth / 2), currentY + 32.5, { align: 'center' });
+  doc.text(`Verified: ${todayDateStr} · Digital ID: NST-OP-892`, box1X + (colBoxWidth / 2), currentY + 35.5, { align: 'center' });
+
+  // Box 2: Quality Assurance
+  const box2X = marginX + colBoxWidth + colGap;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(box2X, currentY, colBoxWidth, boxHeight, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Diperiksa Oleh (Quality Assurance):', box2X + (colBoxWidth / 2), currentY + 4.5, { align: 'center' });
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(100, 116, 139);
+  doc.text('[AUDITED & ISO 9001:2015 COMPLIANT]', box2X + (colBoxWidth / 2), currentY + 8, { align: 'center' });
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(5.2);
+  doc.setTextColor(148, 163, 184);
+  doc.text('( Ruang Tanda Tangan / TTD & Stempel )', box2X + (colBoxWidth / 2), currentY + 18, { align: 'center' });
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(box2X + 8, currentY + 25, box2X + colBoxWidth - 8, currentY + 25);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Wawan Setiawan, S.T.', box2X + (colBoxWidth / 2), currentY + 29, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('QA & Safety Compliance Lead Inspector', box2X + (colBoxWidth / 2), currentY + 32.5, { align: 'center' });
+  doc.text('Status: Audited & ISO 9001 Approved', box2X + (colBoxWidth / 2), currentY + 35.5, { align: 'center' });
+
+  // Box 3: Manager Operasi
+  const box3X = marginX + (colBoxWidth * 2) + (colGap * 2);
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(box3X, currentY, colBoxWidth, boxHeight, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Disetujui Oleh (Manager Operasi):', box3X + (colBoxWidth / 2), currentY + 4.5, { align: 'center' });
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(100, 116, 139);
+  doc.text('[AUTHORIZED & APPROVED FOR ISSUE]', box3X + (colBoxWidth / 2), currentY + 8, { align: 'center' });
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(5.2);
+  doc.setTextColor(148, 163, 184);
+  doc.text('( Ruang Tanda Tangan / TTD & Stempel )', box3X + (colBoxWidth / 2), currentY + 18, { align: 'center' });
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(box3X + 8, currentY + 25, box3X + colBoxWidth - 8, currentY + 25);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Probo Subagyo, M.M.', box3X + (colBoxWidth / 2), currentY + 29, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Fleet & Operations Manager', box3X + (colBoxWidth / 2), currentY + 32.5, { align: 'center' });
+  doc.text('Status: Authorized & Legally Executed', box3X + (colBoxWidth / 2), currentY + 35.5, { align: 'center' });
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.8);
+  doc.setTextColor(148, 163, 184);
+  doc.text('Sistem Elektronik Pelacakan IsoTrack PT Niaga Segara Trasindo · Dokumen Sah Hukum Elektronik', marginX, pageHeight - 6);
+  doc.text(`Nomor Surat Jalan: ${lead.no_surat_jalan} · Klasifikasi: DOKUMEN SAH PERUSAHAAN`, pageWidth - marginX - 90, pageHeight - 6);
+
+  // Save PDF
+  const cleanSuratJalan = lead.no_surat_jalan.replace(/[^a-zA-Z0-9]/g, '_');
+  doc.save(`Surat_Jalan_BASTP_Resmi_${cleanSuratJalan}.pdf`);
+};
+
+/**
+ * Downloads a formal B2B Client Service Order Confirmation & Work Order Agreement PDF
+ * (Surat Konfirmasi Pemesanan Jasa Logistik & Perjanjian Layanan Work Order)
+ * Issued by PT Niaga Segara Transindo for Client official proof of booking.
+ * Contains official Kop Surat, NIB/NPWP, B3 transport license, SLA terms, legal clauses,
+ * dual signature boxes (PT NST Manager + Client Representative), and QR validation link.
+ */
+export const downloadClientServiceOrderPDF = (lead: any, currentUser?: any) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+  const marginX = 12;
+  const printableWidth = pageWidth - (marginX * 2); // 186 mm
+
+  const todayDateStr = new Date().toLocaleDateString('id-ID', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  }); // e.g., "03 November 2026"
+
+  const timeNowStr = `${todayDateStr} pukul ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
+
+  // 1. Watermark (Faint slate-100 color to avoid interfering with readability)
+  try {
+    doc.saveGraphicsState();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(241, 245, 249); // slate-100
+    const watermarkText = `CONFIDENTIAL B2B WORK ORDER · PT NIAGA SEGARA TRASINDO · ${lead.client_company || 'KLIEN'} · ${timeNowStr}`;
+    doc.text(watermarkText, pageWidth / 2, pageHeight / 2, {
+      align: 'center',
+      angle: 35,
+    });
+    doc.restoreGraphicsState();
+  } catch (e) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(241, 245, 249);
+    doc.text(`CONFIDENTIAL WORK ORDER - ${lead.client_company}`, pageWidth / 2, pageHeight / 2, { align: 'center' });
+  }
+
+  // 2. KOP SURAT PERUSAHAAN (TOP)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text('PT NIAGA SEGARA TRASINDO', marginX, 11.5);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(13, 148, 136); // teal-600
+  doc.text('DIVISI MARKETING & OPERASIONAL LOGISTIK ISOTANK CHEMICAL MULTIMODA', marginX, 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Graha Segara Lt. 4, Jl. Perak Timur No. 512, Pelabuhan Tanjung Perak, Surabaya 60165', marginX, 20);
+  doc.text('Telp: (031) 329-8877 | Fax: (031) 329-8878 | Email: order@niagasegara.co.id | Web: www.niagasegara.co.id', marginX, 23.5);
+  doc.text('NPWP: 01.884.992.3-604.000 | NIB: 9120004812391 | Izin Transporter B3: SK-MENLHK/089/2023 | ISO 9001:2015 & ISO 14001', marginX, 27);
+
+  // TOP RIGHT OFFICIAL VERIFICATION BADGE (In Kop Surat, above the double line!)
+  doc.setDrawColor(13, 148, 136);
+  doc.setFillColor(240, 253, 250);
+  doc.roundedRect(pageWidth - marginX - 38, 9, 38, 12, 1, 1, 'FD');
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(13, 148, 136);
+  doc.text('[ VERIFIED SAH ]', pageWidth - marginX - 19, 13, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(30, 41, 59);
+  doc.text('WORK ORDER TERVERIFIKASI', pageWidth - marginX - 19, 17, { align: 'center' });
+
+  // Dual Line Separator (Teal + Navy)
+  doc.setDrawColor(13, 148, 136);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, 29, pageWidth - marginX, 29);
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(0.25);
+  doc.line(marginX, 30, pageWidth - marginX, 30);
+
+  // 3. DOCUMENT TITLE & STAMP BADGE (UNIMPEDED FULL WIDTH BELOW LINE)
+  let currentY = 35.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text('SURAT KONFIRMASI PEMESANAN JASA & WORK ORDER', pageWidth / 2, currentY, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(13, 148, 136);
+  doc.text('(SERVICE ORDER CONFIRMATION & LOGISTICS AGREEMENT)', pageWidth / 2, currentY + 4, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
+  const docRegNo = `Nomor Work Order: WO/NST-2026/${lead.lead_code || 'LEAD-00101'}/${(lead.no_surat_jalan || 'SJ-NST').replace(/\//g, '-')}`;
+  doc.text(docRegNo, pageWidth / 2, currentY + 8, { align: 'center' });
+
+  currentY += 14;
+
+  // 4. SECTION I: DATA PEMESAN & IDENTITAS ORDER KLIEN
+  doc.setFillColor(15, 23, 42); // Dark Navy header bar
+  doc.rect(marginX, currentY, printableWidth, 4.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('  I. DATA PEMESAN & REFERENSI WORK ORDER KLIEN', marginX, currentY + 3.2);
+  currentY += 4.5;
+
+  const isApproved = (lead.current_step || 1) >= 2;
+  const statusOrderStr = isApproved ? 'TERBINA & DISETUJUI MANAGER (DOKUMEN RESMI SAH)' : 'PROFORMA WORK ORDER (INISIASI ORDER)';
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: marginX, right: marginX },
+    tableWidth: printableWidth,
+    theme: 'grid',
+    columnStyles: {
+      0: { cellWidth: 44, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      1: { cellWidth: 49, textColor: [15, 23, 42] },
+      2: { cellWidth: 44, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      3: { cellWidth: 49, textColor: [15, 23, 42] }
+    },
+    styles: { fontSize: 6.8, cellPadding: 1.8, lineColor: [226, 232, 240], lineWidth: 0.15 },
+    body: [
+      [
+        'Perusahaan Pemesan (Klien):', lead.client_company || 'PT Petrokimia Utama Indonesia',
+        'Nomor Surat Jalan Klien:', lead.no_surat_jalan
+      ],
+      [
+        'Kode Lead Sistem:', lead.lead_code || 'LEAD-00101',
+        'Tanggal Booking / Penerbitan:', todayDateStr
+      ],
+      [
+        'Status Legalitas Order:', statusOrderStr,
+        'Manager Penanggung Jawab:', lead.manager_name || 'Probo Subagyo, M.M.'
+      ]
+    ]
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 4;
+
+  // 5. SECTION II: SPESIFIKASI LAYANAN LOGISTIK & ANGKUTAN MULTIMODA
+  doc.setFillColor(13, 148, 136); // Teal header bar
+  doc.rect(marginX, currentY, printableWidth, 4.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('  II. SPESIFIKASI LAYANAN LOGISTIK & RUTE ANGKUTAN ISOTANK', marginX, currentY + 3.2);
+  currentY += 4.5;
+
+  const vendorName = lead.transport_vendor_name || 'PT Segara Logistik Express';
+  const driver = lead.nama_supir || 'Bambang Susanto (SIM B2 Umum)';
+  const truckPlate = lead.no_plat_truk || 'B 9842 UFX';
+  const modeShipment = lead.is_inter_island
+    ? `MULTIMODA (Darat + Kapal Laut ${lead.shipping_company || 'Ro-Ro'} / ${lead.vessel_name || 'Kargo'})`
+    : 'DIRECT TRANSPORT DARAT (Truk Isotank)';
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: marginX, right: marginX },
+    tableWidth: printableWidth,
+    theme: 'grid',
+    columnStyles: {
+      0: { cellWidth: 44, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      1: { cellWidth: 49, textColor: [15, 23, 42] },
+      2: { cellWidth: 44, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      3: { cellWidth: 49, textColor: [15, 23, 42] }
+    },
+    styles: { fontSize: 6.8, cellPadding: 1.8, lineColor: [226, 232, 240], lineWidth: 0.15 },
+    body: [
+      [
+        'Jenis Muatan Chemical / Liquid:', lead.muatan || 'Caustic Soda Liquid 48%',
+        'Spesifikasi Unit Isotank:', `${lead.asset_code} (Kapasitas 24.000 L)`
+      ],
+      [
+        'Lokasi Depo Asal (Pengambilan):', lead.asal || 'Depo Utama Tuban',
+        'Tujuan Pembongkaran Klien:', lead.tujuan || 'Kawasan Industri Petrokimia Gresik'
+      ],
+      [
+        'Moda Pengangkutan:', modeShipment,
+        'Estimasi Ketibaan Target (SLA):', new Date(lead.target_at).toLocaleString('id-ID')
+      ],
+      [
+        'Penyedia Truk & Plat Pengangkut:', `${vendorName} (${truckPlate})`,
+        'Pengemudi / Supir Berlisensi:', driver
+      ]
+    ]
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 4;
+
+  // 6. SECTION III: KLAUSUL HUKUM B2B & KETENTUAN HUKUM PENGANGKUTAN
+  doc.setFillColor(30, 41, 59); // Slate Navy header bar
+  doc.rect(marginX, currentY, printableWidth, 4.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('  III. KETENTUAN HUKUM B2B & SYARAT PENGANGKUTAN MUATAN CHEMICAL', marginX, currentY + 3.2);
+  currentY += 6.5;
+
+  const legalClauses = [
+    { title: 'Pasal 1 (Landasan Hukum Pengangkutan B2B):', text: 'Pemesanan jasa ini tunduk pada KUHD (Kitab Undang-Undang Hukum Dagang) Pasal 468 s.d. 479 mengenai Tanggung Jawab Pengangkut serta Permenhub No. PM 60/2019 tentang Pengangkutan Barang Dengan Kendaraan Motor di Jalan.' },
+    { title: 'Pasal 2 (Kepatuhan Muatan Bahan Berbahaya & Beracun - B3):', text: 'Transportasi muatan kimia dilaksanakan berlandaskan Surat Izin Operasional Transporter B3 Kementerian LHK RI No. SK-MENLHK/089/2023. Klien menjamin kebenaran dokumen MSDS (Material Safety Data Sheet) yang diserahkan.' },
+    { title: 'Pasal 3 (Integritas Segel & Tangki - Safety Guarantee):', text: 'PT Niaga Segara Trasindo menjamin unit Isotank telah lulus pemeriksaan kebersihan (PTI Audit Steril) serta dilengkapi segel keselamatan utuh yang wajib diperiksa saat pembongkaran di lokasi Klien.' },
+    { title: 'Pasal 4 (Syarat Pembayaran / Term of Payment - TOP):', text: 'Tagihan resmi (Invoice) diterbitkan dengan jangka waktu pembayaran (TOP) 30 hari kalender sejak penandatanganan Berita Acara Serah Terima Penerimaan (BASTP) fisik/digital.' },
+    { title: 'Pasal 5 (Keadaan Kahar / Force Majeure):', text: 'Penundaan akibat penutupan pelabuhan oleh Otoritas Syahbandar, larangan melintas dinas perhubungan, atau bencana alam di luar kontrol Pengangkut dikoordinasikan secara transparan tanpa penalti SLA.' }
+  ];
+
+  legalClauses.forEach((clause) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(clause.title, marginX, currentY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.2);
+    doc.setTextColor(51, 65, 85);
+    
+    // Fit text with clean indent
+    const wrapped = doc.splitTextToSize(clause.text, printableWidth - 5);
+    doc.text(wrapped, marginX + 3, currentY + 3.2);
+    currentY += 3.2 + (wrapped.length * 2.7) + 1.2;
+  });
+
+  currentY += 2;
+
+  // 7. SECTION IV: LEMBAR TANDA TANGAN DUAL STAMP (DUAL SIGNATURE BLOCK)
+  doc.setFillColor(15, 23, 42); // Dark Navy header bar
+  doc.rect(marginX, currentY, printableWidth, 4.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('  IV. LEMBAR PERSETUJUAN & DOKUMEN PEMESANAN SAH DUA PIHAK', marginX, currentY + 3.2);
+  currentY += 6.5;
+
+  const boxHeight = 42;
+  const colGap = 6;
+  const colBoxWidth = (printableWidth - colGap) / 2; // 90 mm each
+
+  // Box A: Pihak Pengangkut (PT Niaga Segara Trasindo)
+  const boxAX = marginX;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(boxAX, currentY, colBoxWidth, boxHeight, 1.2, 1.2, 'FD');
+
+  // Box A Header bar
+  doc.setFillColor(13, 148, 136);
+  doc.rect(boxAX, currentY, colBoxWidth, 4.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.2);
+  doc.setTextColor(255, 255, 255);
+  doc.text('PIHAK PENGANGKUT (PT NIAGA SEGARA TRASINDO)', boxAX + (colBoxWidth / 2), currentY + 3.2, { align: 'center' });
+
+  // Box A Content & Stamp
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(13, 148, 136);
+  doc.text('[ STEMPEL & TTD DIGITAL PERUSAHAAN ]', boxAX + (colBoxWidth / 2), currentY + 8.5, { align: 'center' });
+
+  // Stylized Digital Seal Badge box
+  doc.setFillColor(240, 253, 250);
+  doc.setDrawColor(13, 148, 136);
+  doc.roundedRect(boxAX + 15, currentY + 10.5, colBoxWidth - 30, 11, 1, 1, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(13, 148, 136);
+  doc.text('✓ SYSTEM VERIFIED & AUTHORIZED', boxAX + (colBoxWidth / 2), currentY + 14.5, { align: 'center' });
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(4.8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`QR: NST-WO-${(lead.lead_code || '101').toUpperCase()}`, boxAX + (colBoxWidth / 2), currentY + 18.5, { align: 'center' });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(boxAX + 10, currentY + 25, boxAX + colBoxWidth - 10, currentY + 25);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Probo Subagyo, M.M.', boxAX + (colBoxWidth / 2), currentY + 29, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Fleet & Operations Manager - PT NST', boxAX + (colBoxWidth / 2), currentY + 32.5, { align: 'center' });
+  doc.text(`Authorized: ${todayDateStr} · SK-MENLHK/089/2023`, boxAX + (colBoxWidth / 2), currentY + 35.8, { align: 'center' });
+
+  // Box B: Pihak Pemesan (Perusahaan Klien)
+  const boxBX = marginX + colBoxWidth + colGap;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(boxBX, currentY, colBoxWidth, boxHeight, 1.2, 1.2, 'FD');
+
+  // Box B Header bar
+  doc.setFillColor(30, 41, 59);
+  doc.rect(boxBX, currentY, colBoxWidth, 4.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.8);
+  doc.setTextColor(255, 255, 255);
+  const clientHeader = `PIHAK PEMESAN (${(lead.client_company || 'KLIEN').toUpperCase()})`;
+  doc.text(clientHeader, boxBX + (colBoxWidth / 2), currentY + 3.2, { align: 'center', maxWidth: colBoxWidth - 4 });
+
+  // Box B Dotted Stamp Area
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(5.2);
+  doc.setTextColor(100, 116, 139);
+  doc.text('[ LEMBAR PROOF OF ORDER KLIEN ]', boxBX + (colBoxWidth / 2), currentY + 8.5, { align: 'center' });
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(5.2);
+  doc.setTextColor(148, 163, 184);
+  doc.text('( Ruang Tanda Tangan & Stempel Resmi Klien )', boxBX + (colBoxWidth / 2), currentY + 16, { align: 'center' });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(boxBX + 10, currentY + 25, boxBX + colBoxWidth - 10, currentY + 25);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Perwakilan Pemesan / Logistics Manager', boxBX + (colBoxWidth / 2), currentY + 29, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Divisi Pengadaan & Logistik - ${lead.client_company || 'Klien'}`, boxBX + (colBoxWidth / 2), currentY + 32.5, { align: 'center' });
+  doc.text('Disetujui Sebagai Bukti Sah Pemesanan Jasa', boxBX + (colBoxWidth / 2), currentY + 35.8, { align: 'center' });
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.8);
+  doc.setTextColor(148, 163, 184);
+  doc.text('Sistem Elektronik Pelacakan IsoTrack PT Niaga Segara Trasindo · Dokumen Konfirmasi Order Jasa', marginX, pageHeight - 6);
+  doc.text(`Nomor Surat Jalan: ${lead.no_surat_jalan} · Klasifikasi: DOKUMEN SAH KLIEN`, pageWidth - marginX - 90, pageHeight - 6);
+
+  // Trigger Save PDF
+  const cleanSuratJalan = (lead.no_surat_jalan || 'SJ-NST').replace(/[^a-zA-Z0-9]/g, '_');
+  doc.save(`Surat_Konfirmasi_Order_Jasa_PT_NST_${cleanSuratJalan}.pdf`);
+};
+
+/**
+ * Downloads a formal PDF report of System Audit Logs with letterhead
+ */
+export const downloadAuditLogsPDF = (logs: any[], meta: CorporateReportMetadata) => {
+  const headers = ['Nomor Log', 'Waktu Lengkap', 'Pengguna & Peran', 'Aksi Sistem', 'Entitas Target', 'Detail Catatan Transaksi'];
+  const rows = logs.map(l => [
+    l.log_number,
+    l.timestamp,
+    `${l.user_name} (${l.user_role.toUpperCase()})`,
+    l.action,
+    `${l.entity} #${l.entity_id}`,
+    l.details
+  ]);
+
+  const summary = [
+    { label: 'Total Rekord Audit Log', value: `${logs.length} Entri Log` },
+    { label: 'Sifat Catatan Audit', value: 'Immutable & Append-Only' },
+    { label: 'Kepatuhan Standar', value: 'ISO 9001:2015 Security Audit Trail' }
+  ];
+
+  downloadCorporatePDF(
+    {
+      title: 'Laporan Audit Trail & Log Aktivitas Sistem Informasi IsoTrack',
+      reportCode: `NST-AUD-${Date.now().toString().slice(-6)}`,
+      periodText: meta.periodText || 'Semua Log Sistem',
+      generatedBy: meta.generatedBy || 'Administrator',
+      generatedRole: meta.generatedRole || 'SYSTEM_AUDITOR',
+      generatedAt: meta.generatedAt || new Date().toLocaleString('id-ID'),
+      totalRecords: logs.length
+    },
+    { headers, rows, summary },
+    'Laporan_Audit_Log_Sistem_PT_NST'
+  );
+};
+

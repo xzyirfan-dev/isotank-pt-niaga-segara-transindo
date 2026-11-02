@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Truck, Search, Filter, PlusCircle, Clock, CheckCircle2, AlertTriangle,
   RotateCcw, FileText, ChevronRight, User as UserIcon, ArrowUpDown,
@@ -20,8 +20,6 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
     currentUser,
     leadViewMode,
     setLeadViewMode,
-    tableDensity,
-    setTableDensity,
     savedFilterPresets,
     activePresetFilterId,
     applySavedPreset,
@@ -37,6 +35,8 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
   const [selectedBulkPicId, setSelectedBulkPicId] = useState<string>('');
   const [hoveredLeadId, setHoveredLeadId] = useState<string | null>(null);
   const [infoStageTooltip, setInfoStageTooltip] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const LEADS_PER_VIEW = 10;
 
   // Filter leads based on chips, search, PIC, and saved presets
   const displayedLeads = useMemo(() => {
@@ -97,6 +97,31 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
       return true;
     });
   }, [filteredLeads, activeStageFilter, picFilter, searchQuery, activePresetFilterId, savedFilterPresets]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeStageFilter, picFilter, searchQuery, activePresetFilterId]);
+
+  const totalPages = Math.ceil(displayedLeads.length / LEADS_PER_VIEW) || 1;
+  const startIndex = (currentPage - 1) * LEADS_PER_VIEW;
+  const paginatedLeads = displayedLeads.slice(startIndex, startIndex + LEADS_PER_VIEW);
+
+  const handleScrollUp = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+      const el = document.getElementById('leads-table-container');
+      if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleScrollDown = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+      const el = document.getElementById('leads-table-container');
+      if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Bulk Selection Handlers
   const handleToggleSelectAll = () => {
@@ -184,34 +209,6 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
             </button>
           </div>
 
-          {/* Density Switcher (Active only in Table Mode) */}
-          {leadViewMode === 'table' && (
-            <div className="hidden sm:flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 shadow-sm">
-              <button
-                onClick={() => setTableDensity('comfortable')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  tableDensity === 'comfortable'
-                    ? 'bg-slate-800 text-teal-300 font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Kepadatan Baris Nyaman (Comfortable)"
-              >
-                Nyaman
-              </button>
-              <button
-                onClick={() => setTableDensity('compact')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  tableDensity === 'compact'
-                    ? 'bg-slate-800 text-teal-300 font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Kepadatan Baris Padat (Compact)"
-              >
-                Padat
-              </button>
-            </div>
-          )}
-
           {/* Primary Action Button */}
           <button
             onClick={onOpenNewLead}
@@ -223,104 +220,136 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
         </div>
       </div>
 
-      {/* Saved Filter Presets Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">
-          Preset Cepat:
-        </span>
-        <button
-          onClick={() => applySavedPreset(null)}
-          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-            activePresetFilterId === null
-              ? 'bg-slate-800 text-teal-300 border border-teal-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
-        >
-          Semua Data
-        </button>
-        {savedFilterPresets.map(preset => (
-          <button
-            key={preset.id}
-            onClick={() => applySavedPreset(preset.id === activePresetFilterId ? null : preset.id)}
-            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
-              preset.id === activePresetFilterId
-                ? 'bg-teal-500 text-slate-950 font-black shadow-sm'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 border border-slate-700/60'
-            }`}
-            title={preset.description}
-          >
-            <span>{preset.name}</span>
-          </button>
-        ))}
+      {/* Saved Filter Presets Bar (Full Width Responsive Grid, 1-Word Professional Labels) */}
+      <div className="p-2 rounded-2xl bg-slate-900/40 border border-transparent shadow-sm w-full backdrop-blur-md">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 w-full">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 font-mono shrink-0">
+            PRESET CEPAT:
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 flex-1 w-full">
+            <button
+              onClick={() => applySavedPreset(null)}
+              className={`w-full py-1.5 px-2 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center ${
+                activePresetFilterId === null
+                  ? 'bg-teal-500 text-slate-950 font-black shadow-sm'
+                  : 'bg-slate-950/60 text-slate-300 hover:bg-slate-900 hover:text-slate-100'
+              }`}
+            >
+              <span className="whitespace-nowrap font-bold text-xs">Semua</span>
+            </button>
+            {savedFilterPresets.map(preset => {
+              let oneWordLabel = preset.name;
+              if (preset.id === 'preset-kritis') oneWordLabel = '🔴 Kritis';
+              else if (preset.id === 'preset-kapal') oneWordLabel = '🚢 Laut';
+              else if (preset.id === 'preset-kimia') oneWordLabel = '🧪 Kimia';
+              else if (preset.id === 'preset-approval') oneWordLabel = '🟡 Approval';
+              else {
+                oneWordLabel = preset.name.replace(/^(🔴|🚢|🧪|🟡)\s*/, '').split(' ')[0] || preset.name;
+              }
+
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => applySavedPreset(preset.id === activePresetFilterId ? null : preset.id)}
+                  className={`w-full py-1.5 px-2 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center space-x-1 ${
+                    preset.id === activePresetFilterId
+                      ? 'bg-teal-500 text-slate-950 font-black shadow-sm'
+                      : 'bg-slate-950/60 text-slate-300 hover:bg-slate-900 hover:text-slate-100 border border-transparent'
+                  }`}
+                  title={preset.description}
+                >
+                  <span className="whitespace-nowrap font-bold text-xs">{oneWordLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Stage Chips Filter Bar with (i) Info Contextual Popover */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center gap-1.5 overflow-x-auto">
-        <button
-          onClick={() => setActiveStageFilter('all')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
-            activeStageFilter === 'all'
-              ? 'bg-teal-500 text-slate-950 shadow-md font-black'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <span>Semua Tahap</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-slate-950/40 text-[10px] font-mono tabular-nums">
-            {filteredLeads.length}
-          </span>
-        </button>
+      {/* Stage Chips Filter Bar (Full Width 9-Column Grid, Fully Visible Text, Zero Truncation) */}
+      <div className="bg-slate-900/40 border border-transparent rounded-2xl p-2 w-full backdrop-blur-md relative overflow-visible">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 w-full">
+          
+          {/* Semua Tahap Button */}
+          <button
+            onClick={() => setActiveStageFilter('all')}
+            className={`w-full py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1 ${
+              activeStageFilter === 'all'
+                ? 'bg-teal-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-950/60 text-slate-300 hover:bg-slate-900 hover:text-slate-100'
+            }`}
+          >
+            <span className="whitespace-nowrap font-bold text-[11px] tracking-tight">Semua</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-950/40 text-[10px] font-mono font-bold tabular-nums">
+              {filteredLeads.length}
+            </span>
+          </button>
 
-        {STAGE_LIST.map((stg) => {
-          const count = filteredLeads.filter(l => l.status === stg.id).length;
-          const isSelected = activeStageFilter === stg.id;
-          return (
-            <div key={stg.step} className="relative flex items-center">
-              <button
-                onClick={() => setActiveStageFilter(stg.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
-                  isSelected
-                    ? 'bg-teal-500 text-slate-950 shadow-md font-black'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                <span>{stg.shortName}</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono tabular-nums ${
-                  isSelected ? 'bg-slate-950/40 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400'
-                }`}>
-                  {count}
-                </span>
-              </button>
+          {/* 8 Stage Buttons */}
+          {STAGE_LIST.map((stg) => {
+            const count = filteredLeads.filter(l => l.status === stg.id).length;
+            const isSelected = activeStageFilter === stg.id;
+            return (
+              <div key={stg.step} className="relative flex items-center w-full">
+                <button
+                  onClick={() => setActiveStageFilter(stg.id)}
+                  className={`w-full py-2 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1 ${
+                    isSelected
+                      ? 'bg-teal-500 text-slate-950 shadow-md font-black'
+                      : 'bg-slate-950/60 text-slate-300 hover:bg-slate-900 hover:text-slate-100'
+                  }`}
+                >
+                  <span className="whitespace-nowrap font-bold text-[11px] tracking-tight">
+                    {stg.shortName}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold tabular-nums ${
+                    isSelected ? 'bg-slate-950/40 text-slate-950' : 'bg-slate-900 text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
 
-              {/* Info (i) icon for stage definition */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setInfoStageTooltip(infoStageTooltip === stg.step ? null : stg.step);
-                }}
-                className="ml-1 p-1 text-slate-500 hover:text-teal-400 rounded-full"
-                title={`Definisi & Aturan ${stg.name}`}
-              >
-                <Info className="w-3 h-3" />
-              </button>
+                {/* Info ! icon in yellow */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoStageTooltip(infoStageTooltip === stg.step ? null : stg.step);
+                  }}
+                  className="absolute -top-1.5 -right-1.5 p-0.5 text-amber-400 hover:text-yellow-300 font-black text-xs leading-none transition-all z-10 cursor-pointer active:scale-125"
+                  title={`Definisi ${stg.name}`}
+                >
+                  !
+                </button>
 
-              {/* Contextual Info Tooltip */}
-              {infoStageTooltip === stg.step && (
-                <div className="absolute top-10 left-0 w-64 bg-slate-950 border border-teal-500/40 rounded-xl p-3 shadow-2xl z-30 text-xs space-y-1.5">
-                  <div className="font-extrabold text-teal-300 flex items-center justify-between">
-                    <span>{stg.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">Stage {stg.step}</span>
+                {/* Info Popover - Positioned at Top Right of Button without Clipping */}
+                {infoStageTooltip === stg.step && (
+                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-950 border border-teal-500/50 rounded-2xl p-3.5 shadow-2xl z-[90] text-xs space-y-2 animate-fadeIn backdrop-blur-xl">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                      <span className="font-black text-teal-300 text-xs">{stg.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInfoStageTooltip(null);
+                        }}
+                        className="text-slate-400 hover:text-white text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed font-normal">
+                      {stg.description}
+                    </p>
+                    <div className="text-[10px] text-slate-400 pt-1.5 border-t border-slate-800 flex justify-between items-center">
+                      <span>Aktor Wajib:</span>
+                      <strong className="text-teal-300 font-semibold">{stg.actor}</strong>
+                    </div>
                   </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
-                    {stg.description}
-                  </p>
-                  <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-                    Aktor Wajib: <strong className="text-slate-200">{stg.actor}</strong>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Search & PIC Filter Bar */}
@@ -354,14 +383,51 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
         </div>
       </div>
 
-      {/* VIEW MODE 1: TABEL TRANSAKSIONAL */}
+      {/* VIEW MODE 1: TABEL TRANSAKSIONAL (10 BARIS MAKSIMAL PER TAMPILAN & FITUR SCROLL UP-DOWN) */}
       {leadViewMode === 'table' && (
-        <div className="space-y-3">
-          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-mono">
+        <div className="space-y-2.5">
+          {/* Scroll Up & Down Helper Bar with 10 Leads Indicator (TOP) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 shadow-sm">
+            <div className="flex items-center space-x-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse shrink-0" />
+              <span className="text-[11px] sm:text-xs">
+                Menampilkan <strong className="text-teal-300 font-mono">{displayedLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + LEADS_PER_VIEW, displayedLeads.length)}</strong> dari <strong className="text-white font-mono">{displayedLeads.length} Leads</strong> (Maksimal 10 Baris per View · Halaman {currentPage} dari {totalPages})
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleScrollUp}
+                disabled={currentPage <= 1}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-teal-300 font-bold text-xs flex items-center space-x-1.5 border border-slate-700 transition-all shadow-sm active:scale-95"
+                title="Scroll Naik / Halaman 10 Baris Sebelumnya"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-teal-400" />
+                <span>▲ Scroll Naik</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleScrollDown}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 disabled:cursor-not-allowed text-slate-950 font-black text-xs flex items-center space-x-1.5 shadow-md shadow-teal-500/20 transition-all active:scale-95"
+                title="Scroll Turun / Halaman 10 Baris Selanjutnya"
+              >
+                <span>▼ Scroll Turun</span>
+                <ArrowUpDown className="w-3.5 h-3.5 rotate-180 text-slate-950" />
+              </button>
+            </div>
+          </div>
+
+          {/* Table Container: strictly vertical scroll (overflow-y-auto), ZERO horizontal scrolling (overflow-x-hidden), max 10 leads height */}
+          <div
+            id="leads-table-container"
+            className="w-full overflow-x-hidden overflow-y-auto max-h-[580px] rounded-2xl border border-slate-800 bg-slate-900/95 shadow-xl scroll-smooth relative"
+          >
+            <table className="w-full text-left text-xs border-collapse table-fixed">
+              <thead className="sticky top-0 z-20 bg-slate-950/95 backdrop-blur-md border-b-2 border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-mono shadow-sm">
                 <tr>
-                  <th className="p-3 w-10 text-center">
+                  <th className="p-3 w-10 text-center bg-slate-950">
                     <input
                       type="checkbox"
                       checked={displayedLeads.length > 0 && selectedLeadIds.length === displayedLeads.length}
@@ -369,25 +435,22 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
                       className="rounded border-slate-700 text-teal-500 focus:ring-teal-400 cursor-pointer"
                     />
                   </th>
-                  <th className="p-3">ID Lead & Surat Jalan</th>
-                  <th className="p-3">Klien & Muatan</th>
-                  <th className="p-3">Unit Isotank</th>
-                  <th className="p-3">Rute Distribusi</th>
-                  <th className="p-3">Tahap Alur (Stage)</th>
-                  <th className="p-3">Tenggat SLA</th>
-                  <th className="p-3">PIC Penanggung Jawab</th>
-                  <th className="p-3 text-right">Aksi</th>
+                  <th className="p-3 w-40 sm:w-48 bg-slate-950">ID Lead & Surat Jalan</th>
+                  <th className="p-3 bg-slate-950">Klien & Muatan</th>
+                  <th className="p-3 w-36 sm:w-44 bg-slate-950">Isotank & Rute</th>
+                  <th className="p-3 w-32 sm:w-36 bg-slate-950">Tahap & SLA</th>
+                  <th className="p-3 w-24 text-right bg-slate-950">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {displayedLeads.length === 0 ? (
+                {paginatedLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-slate-400 text-xs">
+                    <td colSpan={6} className="text-center py-12 text-slate-400 text-xs">
                       Tidak ada transaksi lead yang sesuai dengan kriteria pencarian atau filter aktif.
                     </td>
                   </tr>
                 ) : (
-                  displayedLeads.map((lead) => {
+                  paginatedLeads.map((lead) => {
                     const isClosed = lead.status === 'closed';
                     const targetDate = new Date(lead.target_at);
                     const now = new Date();
@@ -395,7 +458,7 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
                     const isOverdue = diffHours < 0 && !isClosed;
                     const isSelected = selectedLeadIds.includes(lead.id);
 
-                    const padClass = tableDensity === 'compact' ? 'py-2 px-3' : 'py-3.5 px-3';
+                    const padClass = 'py-3 px-3';
 
                     return (
                       <tr
@@ -406,7 +469,7 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
                         }`}
                       >
                         {/* Checkbox Column */}
-                        <td className={`${padClass} text-center`} onClick={(e) => e.stopPropagation()}>
+                        <td className={`${padClass} text-center w-10`} onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -417,52 +480,46 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
 
                         {/* ID Lead & Surat Jalan */}
                         <td className={padClass}>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1.5 flex-wrap">
                             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black bg-teal-500/20 text-teal-300 border border-teal-500/30 tabular-nums">
                               {lead.lead_code || 'LEAD-00101'}
                             </span>
-                            <span className="font-extrabold text-slate-100 font-mono group-hover:text-teal-300">
+                            <span className="font-extrabold text-slate-100 font-mono group-hover:text-teal-300 truncate">
                               {lead.no_surat_jalan}
                             </span>
                           </div>
                           {lead.is_inter_island && (
-                            <span className="mt-1 text-[10px] text-cyan-300 font-bold block">
-                              🚢 Kapal: {lead.shipping_company ? lead.shipping_company.replace('PT Pelayaran ', '').replace('PT ', '') : 'Kargo'}
+                            <span className="mt-1 text-[10px] text-cyan-300 font-bold block truncate">
+                              🚢 {lead.shipping_company ? lead.shipping_company.replace('PT Pelayaran ', '').replace('PT ', '') : 'Kapal Kargo'}
                             </span>
                           )}
                         </td>
 
                         {/* Klien & Muatan */}
                         <td className={padClass}>
-                          <div className="font-bold text-slate-200 truncate max-w-[180px]">
+                          <div className="font-bold text-slate-200 truncate">
                             {lead.client_company || 'PT Petrokimia Utama Indonesia'}
                           </div>
-                          <div className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                          <div className="text-[11px] text-slate-400 truncate">
                             {lead.muatan}
                           </div>
                         </td>
 
-                        {/* Unit Isotank */}
+                        {/* Isotank & Rute */}
                         <td className={padClass}>
-                          <span className="font-mono font-bold text-teal-300 text-xs">
-                            {lead.asset_code}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block">
-                            {lead.no_plat_truk || 'B 9842 UFX'}
-                          </span>
-                        </td>
-
-                        {/* Rute */}
-                        <td className={padClass}>
-                          <div className="text-slate-300 font-medium truncate max-w-[160px]">
+                          <div className="flex items-center space-x-1 font-mono font-bold text-teal-300 text-xs">
+                            <span>{lead.asset_code}</span>
+                            <span className="text-[10px] text-slate-500 font-normal">({lead.no_plat_truk})</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
                             {lead.asal} &rarr; {lead.tujuan}
                           </div>
                         </td>
 
-                        {/* Tahap Alur */}
+                        {/* Tahap & SLA */}
                         <td className={padClass}>
                           <div className="flex items-center space-x-1.5">
-                            <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
+                            <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] shrink-0 ${
                               isClosed
                                 ? 'bg-emerald-500 text-slate-950'
                                 : lead.current_step === 2 || lead.current_step === 7
@@ -473,42 +530,36 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
                             }`}>
                               {lead.current_step}
                             </span>
-                            <span className="font-semibold text-slate-200">
+                            <span className="font-bold text-slate-200 truncate text-[11px]">
                               {STAGE_LIST.find(s => s.step === lead.current_step)?.shortName || lead.status}
+                            </span>
+                          </div>
+                          <div className="mt-1">
+                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold font-mono tabular-nums border inline-flex items-center ${
+                              isClosed
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                : isOverdue
+                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                                : diffHours <= 12
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : 'bg-slate-800 text-slate-300 border-slate-700'
+                            }`}>
+                              <Clock className="w-2.5 h-2.5 mr-1" />
+                              {isClosed ? 'Closed' : isOverdue ? `Telat ${Math.abs(diffHours)}j` : `Sisa ${diffHours}j`}
                             </span>
                           </div>
                         </td>
 
-                        {/* Tenggat SLA */}
-                        <td className={padClass}>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tabular-nums border inline-flex items-center space-x-1 ${
-                            isClosed
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                              : isOverdue
-                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
-                              : diffHours <= 12
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              : 'bg-slate-800 text-slate-300 border-slate-700'
-                          }`}>
-                            <Clock className="w-3 h-3 mr-1" />
-                            {isClosed ? 'Selesai (Closed)' : isOverdue ? `Terlambat ${Math.abs(diffHours)}j` : `Sisa ${diffHours}j`}
-                          </span>
-                        </td>
-
-                        {/* PIC */}
-                        <td className={padClass}>
-                          <span className="text-slate-200 font-medium">{lead.pic_name}</span>
-                          <span className="text-[10px] text-slate-500 block">Dibuat: {lead.creator_name}</span>
-                        </td>
-
-                        {/* Aksi */}
+                        {/* PIC & Aksi */}
                         <td className={`${padClass} text-right`}>
+                          <div className="text-slate-300 font-medium truncate text-[11px]">{lead.pic_name}</div>
                           <button
                             onClick={() => setSelectedLeadId(lead.id)}
-                            className="p-1.5 rounded-lg bg-slate-800 group-hover:bg-teal-500 text-slate-400 group-hover:text-slate-950 transition-colors"
-                            title="Buka Lembar Kerja Detail"
+                            className="mt-1 inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-teal-500 text-slate-300 hover:text-slate-950 font-bold text-[11px] transition-colors"
+                            title="Buka Detail Lead"
                           >
-                            <ChevronRight className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Buka</span>
                           </button>
                         </td>
                       </tr>
@@ -518,40 +569,73 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
               </tbody>
             </table>
           </div>
+
+          {/* Scroll Up & Down Helper Bar with 10 Leads Indicator (BOTTOM) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 shadow-sm">
+            <div className="flex items-center space-x-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse shrink-0" />
+              <span className="text-[11px] sm:text-xs">
+                Menampilkan <strong className="text-teal-300 font-mono">{displayedLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + LEADS_PER_VIEW, displayedLeads.length)}</strong> dari <strong className="text-white font-mono">{displayedLeads.length} Leads</strong> (Halaman {currentPage} dari {totalPages})
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleScrollUp}
+                disabled={currentPage <= 1}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-teal-300 font-bold text-xs flex items-center space-x-1.5 border border-slate-700 transition-all shadow-sm active:scale-95"
+                title="Scroll Naik / Halaman 10 Baris Sebelumnya"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-teal-400" />
+                <span>▲ Scroll Naik</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleScrollDown}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 disabled:cursor-not-allowed text-slate-950 font-black text-xs flex items-center space-x-1.5 shadow-md shadow-teal-500/20 transition-all active:scale-95"
+                title="Scroll Turun / Halaman 10 Baris Selanjutnya"
+              >
+                <span>▼ Scroll Turun</span>
+                <ArrowUpDown className="w-3.5 h-3.5 rotate-180 text-slate-950" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* VIEW MODE 2: PAPAN KANBAN 8 TAHAP */}
       {leadViewMode === 'kanban' && (
         <div className="overflow-x-auto pb-4">
-          <div className="flex space-x-4 min-w-[1600px]">
+          <div className="flex items-start space-x-3.5 min-w-[1600px]">
             {STAGE_LIST.map((stg) => {
               const stageLeads = displayedLeads.filter(l => l.status === stg.id);
               return (
                 <div
                   key={stg.step}
-                  className="w-72 bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col space-y-3 shrink-0 shadow-lg"
+                  className="w-72 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-3 flex flex-col space-y-2.5 shrink-0 shadow-lg h-fit"
                 >
                   {/* Column Header */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <div className="flex items-center space-x-2">
-                      <span className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-400 font-bold text-xs flex items-center justify-center font-mono">
+                      <span className="w-5 h-5 rounded-md bg-teal-500/20 text-teal-300 font-bold text-[11px] flex items-center justify-center font-mono">
                         {stg.step}
                       </span>
-                      <span className="text-xs font-bold text-slate-200 truncate">
+                      <span className="text-xs font-bold text-slate-100 truncate">
                         {stg.shortName}
                       </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono font-bold text-slate-400 tabular-nums">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-950 text-[10px] font-mono font-bold text-slate-400 tabular-nums">
                       {stageLeads.length}
                     </span>
                   </div>
 
                   {/* Cards inside stage column */}
-                  <div className="space-y-2.5 overflow-y-auto max-h-[600px] pr-1">
+                  <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5">
                     {stageLeads.length === 0 ? (
-                      <div className="p-4 text-center text-[11px] text-slate-500 border border-dashed border-slate-800 rounded-xl">
-                        Kosong
+                      <div className="p-3 text-center text-[10px] text-slate-500 border border-dashed border-slate-800/80 rounded-xl">
+                        Tidak Ada Lead
                       </div>
                     ) : (
                       stageLeads.map((lead) => {
@@ -564,14 +648,14 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
                           <div
                             key={lead.id}
                             onClick={() => setSelectedLeadId(lead.id)}
-                            className="p-3 bg-slate-950/90 border border-slate-800 hover:border-teal-500/60 rounded-xl shadow-md cursor-pointer transition-all hover:bg-slate-900 group space-y-2"
+                            className="p-3 bg-slate-950/80 border border-slate-800/80 hover:border-teal-500/50 rounded-xl shadow-sm cursor-pointer transition-all hover:bg-slate-900/90 group space-y-2"
                           >
                             <div className="flex items-center justify-between">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
                                 {lead.lead_code}
                               </span>
-                              <span className={`text-[10px] font-mono font-bold tabular-nums ${
-                                isOverdue ? 'text-rose-400' : 'text-slate-400'
+                              <span className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded ${
+                                isOverdue ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-900 text-slate-400'
                               }`}>
                                 {isOverdue ? `Terlambat ${Math.abs(diffHours)}j` : `Sisa ${diffHours}j`}
                               </span>
@@ -581,23 +665,21 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
                               <span className="text-xs font-bold text-slate-100 font-mono block group-hover:text-teal-300 truncate">
                                 {lead.no_surat_jalan}
                               </span>
-                              <span className="text-[11px] text-slate-300 truncate block">
-                                {lead.client_company || 'PT Petrokimia'}
+                              <span className="text-[11px] text-slate-300 truncate block font-medium">
+                                {lead.client_company || 'Perusahaan Klien'}
                               </span>
                             </div>
 
-                            <div className="text-[10px] text-slate-400 space-y-0.5 pt-1 border-t border-slate-800/80">
-                              <div className="flex justify-between">
-                                <span>Muatan:</span>
-                                <strong className="text-slate-200 truncate max-w-[120px]">{lead.muatan}</strong>
+                            <div className="text-[10px] text-slate-400 space-y-1 pt-1.5 border-t border-slate-800/60">
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400">Muatan:</span>
+                                <strong className="text-slate-200 truncate max-w-[130px] font-semibold">{lead.muatan}</strong>
                               </div>
-                              <div className="flex justify-between">
-                                <span>Aset:</span>
-                                <span className="text-teal-300 font-mono">{lead.asset_code}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>PIC:</span>
-                                <span className="text-slate-300">{lead.pic_name}</span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400">Aset & PIC:</span>
+                                <span className="text-slate-300 truncate max-w-[130px]">
+                                  <strong className="text-teal-300 font-mono">{lead.asset_code}</strong> &middot; {lead.pic_name}
+                                </span>
                               </div>
                             </div>
                           </div>

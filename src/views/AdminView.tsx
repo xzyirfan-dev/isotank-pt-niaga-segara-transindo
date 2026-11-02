@@ -16,7 +16,7 @@ export interface AdminViewProps {
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({ initialTab = 'karyawan' }) => {
-  const { assets, users, updateAssetStatus, masterData, updateMasterData } = useApp();
+  const { assets, users, updateAssetStatus, masterData, updateMasterData, clientStageMappings, updateClientStageMappings } = useApp();
   const [adminTab, setAdminTab] = useState<'karyawan' | 'assets' | 'masterdata' | 'sla' | 'security'>(initialTab);
 
   // Asset fleet filters
@@ -32,7 +32,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ initialTab = 'karyawan' })
   const [slaSavedNotice, setSlaSavedNotice] = useState(false);
 
   // Master data sub-tab
-  const [masterSubTab, setMasterSubTab] = useState<'isotank' | 'pic' | 'closure' | 'sla_corridor'>('isotank');
+  const [masterSubTab, setMasterSubTab] = useState<'isotank' | 'pic' | 'closure' | 'sla_corridor' | 'client_mapping'>('isotank');
 
   // Form states for adding new master items
   const [showAddIsotankModal, setShowAddIsotankModal] = useState(false);
@@ -479,6 +479,18 @@ export const AdminView: React.FC<AdminViewProps> = ({ initialTab = 'karyawan' })
               >
                 <Clock3 className="w-3.5 h-3.5" />
                 <span>Batas SLA Koridor ({masterData.slaLimits.length})</span>
+              </button>
+
+              <button
+                onClick={() => setMasterSubTab('client_mapping')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                  masterSubTab === 'client_mapping'
+                    ? 'bg-teal-500 text-slate-950 font-extrabold shadow-sm'
+                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Tahap Tampilan Klien ({clientStageMappings.length})</span>
               </button>
             </div>
 
@@ -1047,6 +1059,52 @@ export const AdminView: React.FC<AdminViewProps> = ({ initialTab = 'karyawan' })
               </div>
             </div>
           )}
+
+          {/* SUB-PANEL 5: TAHAP TAMPILAN KLIEN (MAPPING CONFIGURATION) */}
+          {masterSubTab === 'client_mapping' && (
+            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+                    <span>Aturan Pemetaan Tahap Tampilan Klien (Many-to-One)</span>
+                    <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-bold">FASE 8</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Konfigurasi pemicu internal dan deskripsi netral yang ditampilkan kepada klien pada halaman tracking publik.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {clientStageMappings.map((stg) => (
+                  <div key={stg.id} className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/80 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-300 font-bold flex items-center justify-center text-xs">
+                          {stg.order}
+                        </span>
+                        <strong className="text-slate-100 text-xs">{stg.label}</strong>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-teal-300 font-mono text-[10px] border border-slate-700">
+                        Ikon: {stg.iconType}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-300 text-[11px] italic">{stg.description}</p>
+
+                    <div className="pt-2 border-t border-slate-800 flex items-center space-x-2 flex-wrap gap-y-1">
+                      <span className="text-slate-400 font-bold text-[10px]">Pemicu Status Internal:</span>
+                      {stg.triggerInternalStatuses.map(trig => (
+                        <span key={trig} className="px-2 py-0.5 rounded bg-slate-950 text-slate-300 font-mono text-[10px] border border-slate-800">
+                          {trig}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1265,6 +1323,56 @@ export const AdminView: React.FC<AdminViewProps> = ({ initialTab = 'karyawan' })
                         </span>
                       </td>
                       <td className="p-3 text-[11px] text-slate-400">Hanya Admin yang memiliki kewenangan penuh penghapusan data</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-100">Client Link Token (Base64URL 128-bit)</td>
+                      <td className="p-3">Generasi token acak kriptografis tanpa ID internal & tanpa pola</td>
+                      <td className="p-3 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          Aktif
+                        </span>
+                      </td>
+                      <td className="p-3 text-[11px] text-slate-400">Dibuat via crypto.getRandomValues (16 byte / Base64URL 22 kar)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-100">Public Whitelist Data Filter</td>
+                      <td className="p-3">Penyaringan payload publik tersaring ketat (Daftar Putih)</td>
+                      <td className="p-3 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          Aktif
+                        </span>
+                      </td>
+                      <td className="p-3 text-[11px] text-slate-400">Catatan internal, harga kontrak, & nama reviewer 100% dibuang</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-100">Token Revocation & Expiry</td>
+                      <td className="p-3">Pencabutan link langsung mati dan batas tanggal kedaluwarsa</td>
+                      <td className="p-3 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          Aktif
+                        </span>
+                      </td>
+                      <td className="p-3 text-[11px] text-slate-400">Link yang dicabut/mati menampilkan pesan netral seragam</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-100">SEO Privacy & No-Index</td>
+                      <td className="p-3">Pelindung privasi publik noindex, nofollow, & no-referrer</td>
+                      <td className="p-3 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          Aktif
+                        </span>
+                      </td>
+                      <td className="p-3 text-[11px] text-slate-400">Mencegah mesin pencari indexing halaman pelacakan klien</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-bold text-slate-100">Server-Side RLS (Firestore/Supabase)</td>
+                      <td className="p-3">Isolasi dokumen publik di database server</td>
+                      <td className="p-3 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                          Menunggu Backend
+                        </span>
+                      </td>
+                      <td className="p-3 text-[11px] text-slate-400">Saat ini diisolasi di layer publicTrackingStore sisi klien</td>
                     </tr>
                   </tbody>
                 </table>
