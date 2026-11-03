@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { DatePreset } from '../types';
 
 export const GlobalPeriodFilter: React.FC = () => {
-  const { periodFilter, setPeriodFilter } = useApp();
+  const { periodFilter, setPeriodFilter, activeView } = useApp();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [customStart, setCustomStart] = useState(periodFilter.startDate || '2026-10-01');
   const [customEnd, setCustomEnd] = useState(periodFilter.endDate || '2026-10-31');
@@ -48,178 +48,212 @@ export const GlobalPeriodFilter: React.FC = () => {
   };
 
   const getActiveLabel = () => {
-    if (periodFilter.preset === 'all') return 'Semua Data Riwayat';
-    if (periodFilter.preset === 'month_this') return 'Oktober 2026';
+    if (periodFilter.preset === 'all') return 'All Historical Data';
+    if (periodFilter.preset === 'month_this') return 'January 2026 - May 2026';
     if (periodFilter.preset === 'month_prev') return 'September 2026';
-    if (periodFilter.preset === 'quarter_4') return 'Kuartal IV (Okt-Des 2026)';
-    if (periodFilter.preset === 'year_2026') return 'Tahun Buku 2026';
+    if (periodFilter.preset === 'quarter_4') return 'Q4 (Oct - Dec 2026)';
+    if (periodFilter.preset === 'year_2026') return 'Full Year 2026';
     if (periodFilter.preset === 'custom' && periodFilter.startDate && periodFilter.endDate) {
-      return `${periodFilter.startDate} s/d ${periodFilter.endDate}`;
+      return `${periodFilter.startDate} - ${periodFilter.endDate}`;
     }
-    return 'Oktober 2026';
+    return 'January 2026 - May 2026';
   };
+
+  const getViewDetails = () => {
+    switch (activeView) {
+      case 'dashboard':
+      case 'new_lead':
+        return {
+          title: 'Dashboard',
+          subtitle: 'An airy way to manage sales with care and precision.',
+        };
+      case 'my_tasks':
+        return {
+          title: 'Tugas & Antrean PIC',
+          subtitle: 'Daftar penugasan, verifikasi dokumen, dan tindak lanjut transaksi aktif.',
+        };
+      case 'leads':
+        return {
+          title: 'Transaksi Lead & Muatan',
+          subtitle: 'Pemantauan komprehensif alur 8-tahap pengiriman isotank.',
+        };
+      case 'reports':
+        return {
+          title: 'Laporan & Statistik',
+          subtitle: 'Analisis tonase, performa SLA, utilisasi depo, dan nilai kontrak.',
+        };
+      case 'ai_recommendations':
+        return {
+          title: 'Rekomendasi Cerdas AI',
+          subtitle: 'Deteksi dini bottleneck armada, efisiensi rute, dan mitigasi risiko logistik.',
+        };
+      case 'system_log':
+        return {
+          title: 'Log Sistem & Audit Trail',
+          subtitle: 'Rekam jejak transaksi, kepatuhan segel kontainer, dan keamanan data.',
+        };
+      case 'admin':
+      case 'employee_control':
+        return {
+          title: 'Pengaturan & Master Data',
+          subtitle: 'Konfigurasi akun personil, armada isotank, dan tarif rute.',
+        };
+      default:
+        return {
+          title: 'Dashboard',
+          subtitle: 'An airy way to manage sales with care and precision.',
+        };
+    }
+  };
+
+  const viewInfo = getViewDetails();
 
   return (
     <>
-      {/* Sleek, Transparent, Borderless Global Filter Bar */}
-      <div className="bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs mb-4 shadow-sm backdrop-blur-md">
-        <div className="flex items-center space-x-2.5 text-slate-800 dark:text-slate-200 font-bold">
-          <div className="w-8 h-8 rounded-xl bg-teal-500/15 border border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-300">
-            <Filter className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-slate-900 dark:text-slate-200 font-bold">Filter Periode Analisis</span>
-              <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 text-[11px] font-mono font-bold">
-                {getActiveLabel()}
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal block">
-              Menampilkan data transaksi & laporan sesuai rentang waktu aktif.
-            </span>
-          </div>
+      {/* Siohioma Style Top Title & Period Dropdown Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+            {viewInfo.title}
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-medium">
+            {viewInfo.subtitle}
+          </p>
         </div>
 
-        {/* Clean 'Pilih by Kalender' Trigger Button */}
+        {/* Clean Siohioma Style Date Range Pill Dropdown */}
         <button
           type="button"
           onClick={() => setShowCustomPicker(true)}
-          className="px-3.5 py-1.5 rounded-xl font-bold flex items-center space-x-2 bg-white dark:bg-slate-950/60 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-all shadow-sm active:scale-95"
+          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/80 transition-all shadow-sm active:scale-95 shrink-0 self-start sm:self-auto"
         >
-          <Calendar className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-          <span>Pilih by Kalender</span>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          <Calendar className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
+          <span>{getActiveLabel()}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
         </button>
       </div>
 
-      {/* Non-clipping High Z-Index Backdrop Modal for Calendar Picker */}
+      {/* Non-clipping High Z-Index Modal for Calendar Picker */}
       {showCustomPicker && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl text-xs relative text-slate-900 dark:text-slate-100">
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl text-xs relative text-gray-900 dark:text-slate-100">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300 flex items-center justify-center shadow-inner">
-                  <Calendar className="w-5 h-5 stroke-[2.2]" />
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-2xl bg-[#bef264]/20 text-[#0a1c13] dark:text-[#bef264] flex items-center justify-center">
+                  <Calendar className="w-4 h-4 stroke-[2.5]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Pilih Rentang Kalender</h3>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Atur periode transaksi berdasarkan tanggal atau preset cepat</p>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm">Pilih Rentang Waktu</h3>
+                  <p className="text-[10px] text-gray-500 dark:text-slate-400">Filter transaksi berdasarkan periode atau tanggal tertentu</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCustomPicker(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="w-7 h-7 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Quick Presets Inside Modal */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Preset Periode Cepat:</label>
-              <div className="grid grid-cols-3 gap-1.5">
+            {/* Quick Presets */}
+            <div className="space-y-2">
+              <label className="block text-[11px] text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                Preset Cepat:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setPreset('month_this')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
+                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all ${
                     periodFilter.preset === 'month_this'
-                      ? 'bg-teal-500 text-slate-950 font-extrabold shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                      ? 'bg-[#0a1c13] text-[#bef264] shadow-sm'
+                      : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  Okt 2026
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreset('month_prev')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
-                    periodFilter.preset === 'month_prev'
-                      ? 'bg-teal-500 text-slate-950 font-extrabold shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  Sep 2026
+                  Jan 2026 - Mei 2026
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreset('quarter_4')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
+                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all ${
                     periodFilter.preset === 'quarter_4'
-                      ? 'bg-teal-500 text-slate-950 font-extrabold shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                      ? 'bg-[#0a1c13] text-[#bef264] shadow-sm'
+                      : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  Q4 2026
+                  Kuartal IV (Okt-Des)
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreset('year_2026')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
+                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all ${
                     periodFilter.preset === 'year_2026'
-                      ? 'bg-teal-500 text-slate-950 font-extrabold shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                      ? 'bg-[#0a1c13] text-[#bef264] shadow-sm'
+                      : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  Tahun 2026
+                  Tahun Buku 2026
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreset('all')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all col-span-2 ${
+                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all ${
                     periodFilter.preset === 'all'
-                      ? 'bg-teal-500 text-slate-950 font-extrabold shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                      ? 'bg-[#0a1c13] text-[#bef264] shadow-sm'
+                      : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  Semua Riwayat Data
+                  Semua Riwayat
                 </button>
               </div>
             </div>
 
             {/* Custom Date Inputs */}
-            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-              <label className="block text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Atur Rentang Tanggal Custom:</label>
+            <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-slate-800">
+              <label className="block text-[11px] text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                Rentang Kustom:
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">Tanggal Mulai:</label>
+                  <label className="block text-[10px] text-gray-500 dark:text-slate-400 mb-1 font-medium">Tanggal Mulai:</label>
                   <input
                     type="date"
                     value={customStart}
                     onChange={(e) => setCustomStart(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 text-xs font-mono focus:border-teal-500 focus:outline-none"
+                    className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono focus:border-[#bef264] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">Tanggal Selesai:</label>
+                  <label className="block text-[10px] text-gray-500 dark:text-slate-400 mb-1 font-medium">Tanggal Selesai:</label>
                   <input
                     type="date"
                     value={customEnd}
                     onChange={(e) => setCustomEnd(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 text-xs font-mono focus:border-teal-500 focus:outline-none"
+                    className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono focus:border-[#bef264] focus:outline-none"
                   />
                 </div>
               </div>
             </div>
 
             {/* Modal Actions */}
-            <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setShowCustomPicker(false)}
-                className="px-4 py-2 text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors"
+                className="px-4 py-2 text-xs bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 font-bold rounded-full transition-colors"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={applyCustomDates}
-                className="px-4 py-2 text-xs bg-teal-500 hover:bg-teal-400 text-slate-950 font-black rounded-xl shadow-md transition-all flex items-center space-x-1"
+                className="px-5 py-2 text-xs bg-[#0a1c13] hover:bg-[#142c1f] dark:bg-[#bef264] dark:hover:bg-[#a3e635] text-white dark:text-[#0a1c13] font-black rounded-full shadow-md transition-all flex items-center gap-1.5"
               >
                 <Check className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Terapkan Kalender</span>
+                <span>Terapkan</span>
               </button>
             </div>
 

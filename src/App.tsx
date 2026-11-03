@@ -69,18 +69,21 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-[var(--primary)] selection:text-white transition-colors duration-300 px-0 md:px-4">
-      <div className="w-full max-w-[1600px] mx-auto bg-[var(--bg-surface)] shadow-2xl flex flex-row overflow-hidden min-h-screen md:h-[calc(100vh-2rem)] md:my-4 md:rounded-2xl md:border border-[var(--border-color)]">
-        {/* Sidebar Navigation - Full height */}
+    <div className="min-h-screen bg-[#eaeeea] dark:bg-[#0b120e] text-[var(--text-primary)] font-sans selection:bg-[#bef264] selection:text-[#0a1c13] transition-colors duration-300 p-0 md:p-3 lg:p-4">
+      <div className="w-full max-w-[1720px] mx-auto bg-white dark:bg-[#121b16] shadow-2xl flex flex-row overflow-hidden min-h-screen md:min-h-[calc(100vh-2rem)] md:rounded-[28px] md:border border-gray-200/80 dark:border-slate-800">
+        {/* Sidebar Navigation - Siohioma Deep Forest Green */}
         <Sidebar />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#f8faf8] dark:bg-[#0f1713]">
           {/* Header */}
-          <Header onOpenGoogleLogin={() => setIsGoogleModalOpen(true)} />
+          <Header
+            onOpenGoogleLogin={() => setIsGoogleModalOpen(true)}
+            onOpenNewLead={handleOpenNewLeadModal}
+          />
 
           {/* Main Content */}
-          <main className="flex-1 p-4 md:p-6">
+          <main className="flex-1 p-4 md:p-6 lg:p-7">
             {/* Global Period Filter bar */}
             <GlobalPeriodFilter />
 

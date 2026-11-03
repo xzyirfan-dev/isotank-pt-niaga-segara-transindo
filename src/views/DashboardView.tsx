@@ -5,7 +5,9 @@ import {
   Zap, Award, SlidersHorizontal, Layers, Gauge, Compass, Eye, Download,
   RefreshCw, MapPin, Thermometer, Filter, ChevronRight, ShieldAlert,
   BarChart2, PieChart as PieIcon, Calendar, Check, Search, DollarSign,
-  Target, CheckCheck, FileCheck, Star, ChevronDown, CalendarRange, Users
+  Target, CheckCheck, FileCheck, Star, ChevronDown, CalendarRange, Users,
+  MoreHorizontal, ArrowUpRight, ArrowDownRight, Package, Droplets, Flame,
+  FileSpreadsheet, Shield
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -34,7 +36,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
     currentUser
   } = useApp();
 
-  // Primary Sub-Menu Navigation State: Monitoring vs Tracking
+  // Sub-Menu Navigation: Monitoring (Overview Analytics) vs Tracking (Action Queue & Shipments)
   const [dashboardSubTab, setDashboardSubTab] = useState<'monitoring' | 'tracking'>('monitoring');
 
   // Interactive filters
@@ -47,10 +49,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
   const [actionCategory, setActionCategory] = useState<'all' | 'approval' | 'followup' | 'overdue'>('all');
 
   // Month & Year selector states
-  const [selectedMonth, setSelectedMonth] = useState<number>(10);
+  const [selectedMonth, setSelectedMonth] = useState<number>(5);
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [calendarStart, setCalendarStart] = useState<string>(periodFilter.startDate || '2026-10-01');
-  const [calendarEnd, setCalendarEnd] = useState<string>(periodFilter.endDate || '2026-10-31');
+  const [calendarStart, setCalendarStart] = useState<string>(periodFilter.startDate || '2026-01-01');
+  const [calendarEnd, setCalendarEnd] = useState<string>(periodFilter.endDate || '2026-05-31');
   const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
 
   // Report Download Popup Modal State
@@ -67,50 +69,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
     setTimeout(() => {
       setIsRefreshing(false);
     }, 600);
-  };
-
-  const monthNames = [
-    { num: 1, name: 'Januari' },
-    { num: 2, name: 'Februari' },
-    { num: 3, name: 'Maret' },
-    { num: 4, name: 'April' },
-    { num: 5, name: 'Mei' },
-    { num: 6, name: 'Juni' },
-    { num: 7, name: 'Juli' },
-    { num: 8, name: 'Agustus' },
-    { num: 9, name: 'September' },
-    { num: 10, name: 'Oktober' },
-    { num: 11, name: 'November' },
-    { num: 12, name: 'Desember' },
-  ];
-
-  const handleMonthYearChange = (m: number, y: number) => {
-    setSelectedMonth(m);
-    setSelectedYear(y);
-    const padMonth = String(m).padStart(2, '0');
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const startDate = `${y}-${padMonth}-01`;
-    const endDate = `${y}-${padMonth}-${String(daysInMonth).padStart(2, '0')}`;
-    setCalendarStart(startDate);
-    setCalendarEnd(endDate);
-    setPeriodFilter({
-      preset: 'month_year',
-      startDate,
-      endDate,
-      selectedMonth: m,
-      selectedYear: y,
-    });
-  };
-
-  const handleApplyCalendar = () => {
-    if (calendarStart && calendarEnd) {
-      setPeriodFilter({
-        preset: 'custom',
-        startDate: calendarStart,
-        endDate: calendarEnd,
-      });
-      setShowCalendarModal(false);
-    }
   };
 
   // Filtered Leads
@@ -214,44 +172,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
     });
   }, [closedLeads, finishedLeadsSearch, finishedSlaFilter]);
 
-  const creatorPerformance = useMemo(() => {
-    const map = new Map<string, {
-      name: string;
-      leadsCount: number;
-      totalTonase: number;
-      totalRevenue: number;
-      onTimeCount: number;
-      kpiTotal: number;
-    }>();
-
-    closedLeads.forEach(l => {
-      const name = l.creator_name || l.pic_name || 'Budi Santoso';
-      const existing = map.get(name) || {
-        name,
-        leadsCount: 0,
-        totalTonase: 0,
-        totalRevenue: 0,
-        onTimeCount: 0,
-        kpiTotal: 0,
-      };
-
-      existing.leadsCount += 1;
-      existing.totalTonase += l.volume_tonase || 24;
-      existing.totalRevenue += l.contract_value || 45000000;
-      const isLate = l.sla_hours_actual && l.sla_hours_target && l.sla_hours_actual > l.sla_hours_target;
-      if (!isLate) existing.onTimeCount += 1;
-      existing.kpiTotal += l.kpi_score || 96;
-
-      map.set(name, existing);
-    });
-
-    return Array.from(map.values()).map(item => ({
-      ...item,
-      onTimeRate: item.leadsCount > 0 ? Math.round((item.onTimeCount / item.leadsCount) * 100) : 100,
-      avgKpi: item.leadsCount > 0 ? (item.kpiTotal / item.leadsCount).toFixed(1) : '95.0',
-    }));
-  }, [closedLeads]);
-
   const onTimeCount = closedLeads.filter(l => {
     if (l.sla_hours_actual && l.sla_hours_target) {
       return l.sla_hours_actual <= l.sla_hours_target;
@@ -275,47 +195,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
   const totalDeliveredTonnes = closedLeads.reduce((acc, l) => acc + (l.volume_tonase || 24), 0);
   const totalFinishedRevenue = closedLeads.reduce((acc, l) => acc + (l.contract_value || 45000000), 0);
 
-  const statusCounts = STAGE_LIST.map(stg => ({
-    name: stg.shortName,
-    fullStep: stg.name,
-    count: displayLeads.filter(l => l.status === stg.id).length,
-    color: stg.step === 1 ? '#3b82f6' :
-           stg.step === 2 ? '#f59e0b' :
-           stg.step === 3 ? '#06b6d4' :
-           stg.step === 4 ? '#6366f1' :
-           stg.step === 5 ? '#a855f7' :
-           stg.step === 6 ? '#f97316' :
-           stg.step === 7 ? '#14b8a6' : '#10b981',
-  }));
-
-  const trendData = [
-    { month: 'Mei', volume: 18, cycleHours: 210, tonase: 396 },
-    { month: 'Jun', volume: 22, cycleHours: 204, tonase: 484 },
-    { month: 'Jul', volume: 25, cycleHours: 200, tonase: 550 },
-    { month: 'Agt', volume: 29, cycleHours: 195, tonase: 638 },
-    { month: 'Sep', volume: 34, cycleHours: 192, tonase: 748 },
-    { month: 'Okt', volume: 38, cycleHours: avgCycleHours, tonase: 836 },
+  // Siohioma Paired Revenue Bar Chart Data
+  const revenueBarChartData = [
+    { month: 'Jan', income: 140, expenses: 90 },
+    { month: 'Feb', income: 165, expenses: 110 },
+    { month: 'Mar', income: 155, expenses: 105 },
+    { month: 'Apr', income: 180, expenses: 120 },
+    { month: 'May', income: 193, expenses: 130 },
+    { month: 'Jun', income: 210, expenses: 145 },
   ];
 
-  const routeAnalyticsData = [
-    { rute: 'Surabaya ↔ Cilegon', leads: 14, tonase: 308, slaPercent: 96 },
-    { rute: 'Gresik ↔ Semarang', leads: 10, tonase: 220, slaPercent: 92 },
-    { rute: 'Tuban ↔ Jakarta', leads: 8, tonase: 176, slaPercent: 98 },
-    { rute: 'Pasuruan ↔ Bandung', leads: 6, tonase: 132, slaPercent: 90 },
-  ];
-
-  const assetStatusChartData = [
-    { status: 'Beroperasi', count: operatingAssets, fill: '#14b8a6' },
-    { status: 'Tersedia Depo', count: availableAssets, fill: '#3b82f6' },
-    { status: 'Perawatan', count: maintenanceAssets + 1, fill: '#f59e0b' },
-  ];
-
-  const tickerItems = [
-    `⚡ LIVE: Transaksi LEAD-00101 (SJ-2026-0891) baru saja memasuki Stage 3 (In Progress)`,
-    `🛡️ KUALITAS & KEPATUHAN: QC Seal Integrity Rate Armada Isotank mencapai 98.4%`,
-    `🚨 SLA MONITORING: 2 Lead rute Cilegon mendekati estimasi ketibaan target waktu`,
-    `🚚 FLEET UPDATE: Unit ISO-20T-04 dalam rute perjalanan aktif Gresik ➔ Semarang`,
-    `✅ MANAGER APPROVAL: Lead LEAD-00104 rute Tuban disetujui Manager Probo Subagyo`
+  // Siohioma Donut Chart Data (Total View Performance style)
+  const donutPerformanceData = [
+    { name: 'Aktif On-Track', value: 68, fill: '#bef264' },     // Vibrant Lime
+    { name: 'Armada Depo', value: 23, fill: '#0a1c13' },       // Deep Forest Green
+    { name: 'Perawatan/SLA', value: 16, fill: '#f59e0b' },     // Warm Orange/Amber
   ];
 
   const exportFinishedLeadsCsv = () => {
@@ -343,427 +237,519 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
     document.body.removeChild(link);
   };
 
+  // Recent 6 transactions for the Siohioma "Transaction" card
+  const recentTransactions = useMemo(() => {
+    return leads.slice(0, 6);
+  }, [leads]);
+
   return (
-    <div className="space-y-4 animate-fadeIn">
-      
-      {/* HEADER SECTION WITH SINGLE-ROW MONITORING TABS & COMPACT PERIOD CONTROLS */}
-      <div className="p-3.5 md:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl relative overflow-hidden">
-        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 w-full">
-          
-          {/* Left Side: Title & Sub-Menu Tabs (Monitoring vs Tracking) */}
-          <div className="flex items-center space-x-3 shrink-0">
-            <h1 className="text-lg md:text-xl font-black text-slate-100 tracking-tight">
-              Dasbor Operasional
-            </h1>
+    <div className="space-y-6 animate-fadeIn">
 
-            {/* Sub-Menu Tabs: Monitoring vs Tracking */}
-            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-              <button
-                type="button"
-                onClick={() => setDashboardSubTab('monitoring')}
-                className={`px-3 py-1.5 rounded-lg font-extrabold transition-all flex items-center space-x-1.5 ${
-                  dashboardSubTab === 'monitoring'
-                    ? 'bg-teal-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <BarChart2 className="w-3.5 h-3.5" />
-                <span>Monitoring</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDashboardSubTab('tracking')}
-                className={`px-3 py-1.5 rounded-lg font-extrabold transition-all flex items-center space-x-1.5 ${
-                  dashboardSubTab === 'tracking'
-                    ? 'bg-teal-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Truck className="w-3.5 h-3.5" />
-                <span>Tracking</span>
-                {allActionNeededLeads.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
-                    {allActionNeededLeads.length}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Right Side: Streamlined Compact Period Controls in 1 Row */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end shrink-0">
-            
-            {/* Month Dropdown */}
-            <div className="flex items-center bg-slate-950/60 hover:bg-slate-900 border border-transparent hover:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs transition-all shadow-sm">
-              <Calendar className="w-3.5 h-3.5 text-teal-400 mr-1.5 shrink-0 pointer-events-none" />
-              <select
-                value={selectedMonth}
-                onChange={(e) => handleMonthYearChange(Number(e.target.value), selectedYear)}
-                className="bg-transparent text-slate-100 font-bold text-xs border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 appearance-none cursor-pointer pr-1"
-              >
-                {monthNames.map(m => (
-                  <option key={m.num} value={m.num} className="bg-slate-900 text-slate-100">
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5 pointer-events-none shrink-0" />
-            </div>
-
-            {/* Year Dropdown */}
-            <div className="flex items-center bg-slate-950/60 hover:bg-slate-900 border border-transparent hover:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs transition-all shadow-sm">
-              <select
-                value={selectedYear}
-                onChange={(e) => handleMonthYearChange(selectedMonth, Number(e.target.value))}
-                className="bg-transparent text-slate-100 font-bold font-mono text-xs border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 appearance-none cursor-pointer pr-1"
-              >
-                <option value={2025} className="bg-slate-900 text-slate-100">2025</option>
-                <option value={2026} className="bg-slate-900 text-slate-100">2026</option>
-                <option value={2027} className="bg-slate-900 text-slate-100">2027</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5 pointer-events-none shrink-0" />
-            </div>
-
-            {/* Filter Muatan Dropdown */}
-            <div className="flex items-center bg-slate-950/60 hover:bg-slate-900 border border-transparent hover:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs transition-all shadow-sm">
-              <Filter className="w-3.5 h-3.5 text-cyan-400 mr-1.5 shrink-0 pointer-events-none" />
-              <select
-                value={selectedMuatanFilter}
-                onChange={(e) => setSelectedMuatanFilter(e.target.value)}
-                className="bg-transparent text-slate-100 font-semibold text-xs border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 appearance-none cursor-pointer max-w-[110px] truncate pr-1"
-              >
-                <option value="all" className="bg-slate-900 text-slate-100">Semua Muatan</option>
-                <option value="chemical" className="bg-slate-900 text-slate-100">Chemical</option>
-                <option value="gas" className="bg-slate-900 text-slate-100">Gas Industri</option>
-                <option value="food" className="bg-slate-900 text-slate-100">Food Grade</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5 pointer-events-none shrink-0" />
-            </div>
-
-          </div>
+      {/* ── SubTab Selector (Monitoring vs Tracking) ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center bg-gray-100 dark:bg-slate-800/80 p-1 rounded-full text-xs font-bold">
+          <button
+            onClick={() => setDashboardSubTab('monitoring')}
+            className={`px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+              dashboardSubTab === 'monitoring'
+                ? 'bg-[#0a1c13] text-[#bef264] shadow-sm'
+                : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            <span>Overview & Analytics</span>
+          </button>
+          <button
+            onClick={() => setDashboardSubTab('tracking')}
+            className={`px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+              dashboardSubTab === 'tracking'
+                ? 'bg-[#0a1c13] text-[#bef264] shadow-sm'
+                : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            <span>Tracking & Antrean PIC</span>
+            {allActionNeededLeads.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-[#bef264] text-[#0a1c13] text-[10px] font-black">
+                {allActionNeededLeads.length}
+              </span>
+            )}
+          </button>
         </div>
-      </div>
 
-      {/* Live Ticker Banner (Compact Single Row) */}
-      <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-2 text-xs">
-        <div className="flex items-center space-x-2 truncate">
-          <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-black uppercase tracking-wider shrink-0 font-mono">
-            LIVE TICKER
-          </span>
-          <span className="text-slate-300 font-medium truncate text-[11px]">
-            {tickerItems[tickerIndex]}
-          </span>
+        {/* Filter Muatan Pills */}
+        <div className="hidden md:flex items-center gap-1.5">
+          {['all', 'chemical', 'gas', 'food'].map((type) => (
+            <button
+              key={type}
+              onClick={() => setSelectedMuatanFilter(type)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-all ${
+                selectedMuatanFilter === type
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-[#bef264] border border-emerald-300 dark:border-emerald-800'
+                  : 'bg-white dark:bg-slate-900 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-800 hover:border-gray-300'
+              }`}
+            >
+              {type === 'all' ? 'All Types' : type}
+            </button>
+          ))}
         </div>
-        <button
-          onClick={() => setTickerIndex((prev) => (prev + 1) % tickerItems.length)}
-          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-bold shrink-0"
-        >
-          Lanjut &rarr;
-        </button>
       </div>
 
       {/* ========================================================================= */}
-      {/* SUB-MENU 1: MONITORING (CHARTS & PERFORMANCE DASHBOARDS) */}
+      {/* ── SUBTAB 1: MONITORING (EXACT SIOHIOMA DASHBOARD LAYOUT) ── */}
       {/* ========================================================================= */}
       {dashboardSubTab === 'monitoring' && (
-        <div className="space-y-4 animate-fadeIn">
-          
-          {/* Top Metric Cards Grid (Compact & Futuristic 3D Finly Cards) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            
-            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
-              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-                <span className="font-semibold tracking-wide">Total Lead & Volume</span>
-                <div className="p-1.5 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
-                  <TrendingUp className="w-3.5 h-3.5" />
+        <div className="space-y-6">
+
+          {/* ── ROW 1: Update Card + Net Income + Total Return ── */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+
+            {/* 1. Siohioma Dark Forest Green Update Banner (Span 4 cols) */}
+            <div className="md:col-span-4 bg-[#0a1c13] text-white p-6 rounded-[24px] shadow-sm relative overflow-hidden flex flex-col justify-between group hover:shadow-md transition-all">
+              {/* Decorative Subtle Starburst in Background */}
+              <div className="absolute -right-6 -bottom-6 w-32 h-32 text-white/[0.04] pointer-events-none">
+                <svg className="w-full h-full fill-current" viewBox="0 0 24 24">
+                  <path d="M12 2L13.5 8.5L20 7L15.5 12L20 17L13.5 15.5L12 22L10.5 15.5L4 17L8.5 12L4 7L10.5 8.5L12 2Z" />
+                </svg>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[11px] font-bold text-[#bef264] tracking-wide">
+                    <span className="w-2 h-2 rounded-full bg-[#bef264] animate-pulse" />
+                    Update
+                  </span>
+                  <span className="text-xs text-[#789d87] font-medium">May 12th 2026</span>
                 </div>
-              </div>
-              <div className="flex items-baseline space-x-2">
-                <span className="text-2xl font-black text-[var(--text-primary)] font-mono tabular-nums">{totalLeads}</span>
-                <span className="text-xs text-[var(--primary)] font-bold font-mono">({totalDeliveredTonnes} Ton)</span>
-              </div>
-              <span className="text-[10px] text-[var(--text-muted)] block truncate">
-                {closedCount} Selesai &middot; {activeLeads.length} Aktif
-              </span>
-            </div>
 
-            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
-              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-                <span className="font-semibold tracking-wide">Capaian Tepat Waktu SLA</span>
-                <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
-                  <Clock className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="flex items-baseline space-x-2">
-                <span className="text-2xl font-black text-emerald-600 font-mono tabular-nums">{onTimeRate}%</span>
-                <span className="text-xs text-[var(--text-muted)] font-mono">({avgCycleHours}j avg)</span>
-              </div>
-              <span className="text-[10px] text-[var(--text-muted)] block truncate">
-                Kepatuhan standar waktu rute
-              </span>
-            </div>
-
-            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
-              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-                <span className="font-semibold tracking-wide">Pendapatan Selesai (IDR)</span>
-                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-                  <Award className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="text-xl font-black text-amber-600 font-mono tabular-nums truncate">
-                Rp {(totalFinishedRevenue / 1000000).toFixed(0)} Juta
-              </div>
-              <span className="text-[10px] text-[var(--text-muted)] block truncate">
-                Nilai kontrak lead selesai
-              </span>
-            </div>
-
-            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
-              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-                <span className="font-semibold tracking-wide">Utilisasi Isotank</span>
-                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-500">
-                  <Gauge className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="flex items-baseline space-x-2">
-                <span className="text-2xl font-black text-cyan-600 font-mono tabular-nums">{assetUtilRate}%</span>
-                <span className="text-xs text-[var(--text-muted)] font-mono">({operatingAssets}/{totalAssets})</span>
-              </div>
-              <span className="text-[10px] text-[var(--text-muted)] block truncate">
-                {availableAssets} Tersedia Depo
-              </span>
-            </div>
-
-          </div>
-
-          {/* Charts Row 1: Volume Trend & Asset Distribution */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Chart 1: Trend Volume & Siklus Pengiriman (2 Cols) */}
-            <div className="md:col-span-2 p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <BarChart2 className="w-4 h-4 text-teal-400" />
-                  <h3 className="text-xs font-bold text-slate-100">Tren Realisasi Volume & Tonase (6 Bulan)</h3>
-                </div>
-                <span className="text-[10px] font-mono text-slate-400">Unit: Ton & Jam</span>
+                <h3 className="text-xl font-bold tracking-tight text-white leading-snug mt-2">
+                  Sales revenue & fleet volume increased <span className="text-[#bef264]">40%</span> in 1 week
+                </h3>
               </div>
 
-              <div className="h-52 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="tonaseGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} />
-                    <YAxis stroke="#94a3b8" fontSize={11} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px' }}
-                    />
-                    <Area type="monotone" dataKey="tonase" name="Tonase (Ton)" stroke="#14b8a6" strokeWidth={2} fillOpacity={1} fill="url(#tonaseGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="pt-6">
+                <button
+                  onClick={() => setActiveView('reports')}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#bef264] hover:text-white transition-colors group-hover:translate-x-0.5"
+                >
+                  <span>See Statistics</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* Chart 2: Asset Utilization Donut */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <PieIcon className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-xs font-bold text-slate-100">Status Armada Isotank</h3>
-                </div>
-                <span className="text-[10px] font-mono text-cyan-300 font-bold">{totalAssets} Unit</span>
+            {/* 2. Net Income Stat Card (Span 4 cols) */}
+            <div className="md:col-span-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 rounded-[24px] shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+              <div className="flex items-center justify-between text-gray-500 dark:text-slate-400">
+                <span className="text-xs font-bold tracking-wide uppercase">Net Income</span>
+                <button className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="h-44 w-full relative flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={assetStatusChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={65}
-                      paddingAngle={4}
-                      dataKey="count"
-                    >
-                      {assetStatusChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute text-center">
-                  <span className="text-lg font-black text-slate-100 font-mono">{assetUtilRate}%</span>
-                  <span className="text-[9px] text-slate-400 block font-semibold">Aktif</span>
+              <div className="my-3">
+                <div className="flex items-baseline gap-1 text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+                  <span className="text-lg font-bold text-gray-400 mr-0.5">$</span>
+                  <span>193.000</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-1 text-[10px] text-center border-t border-slate-800 pt-2">
-                <div>
-                  <span className="text-teal-400 font-bold block">{operatingAssets}</span>
-                  <span className="text-slate-400">Beroperasi</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#84cc16] dark:text-[#bef264]">
+                <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                <span>+35% from last month</span>
+              </div>
+            </div>
+
+            {/* 3. Total Return Stat Card (Span 4 cols) */}
+            <div className="md:col-span-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 rounded-[24px] shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+              <div className="flex items-center justify-between text-gray-500 dark:text-slate-400">
+                <span className="text-xs font-bold tracking-wide uppercase">Total Return</span>
+                <button className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="my-3">
+                <div className="flex items-baseline gap-1 text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+                  <span className="text-lg font-bold text-gray-400 mr-0.5">$</span>
+                  <span>32.000</span>
                 </div>
-                <div>
-                  <span className="text-blue-400 font-bold block">{availableAssets}</span>
-                  <span className="text-slate-400">Tersedia</span>
-                </div>
-                <div>
-                  <span className="text-amber-400 font-bold block">{maintenanceAssets + 1}</span>
-                  <span className="text-slate-400">Perawatan</span>
-                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 dark:text-rose-400">
+                <ArrowDownRight className="w-4 h-4 stroke-[2.5]" />
+                <span>-24% from last month</span>
               </div>
             </div>
 
           </div>
 
-          {/* Charts Row 2: Route Ranking & Team KPI Score */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Route Analytics */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <MapPin className="w-4 h-4 text-teal-400" />
-                  <h3 className="text-xs font-bold text-slate-100">Volume & Kepatuhan SLA Rute Utama</h3>
+          {/* ── ROW 2: Main Siohioma Dashboard 3-Column Area ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+            {/* ── Left Column: Transaction List Card (Span 4 cols) ── */}
+            <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 rounded-[24px] shadow-sm space-y-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-3">
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white">Transaction</h3>
+                  <button className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Siohioma Transaction Items List */}
+                <div className="divide-y divide-gray-50 dark:divide-slate-800/60 mt-1">
+                  {recentTransactions.map((tx, idx) => {
+                    const isCompleted = idx % 2 === 0;
+                    const sampleProducts = [
+                      { title: 'Premium T-Shirt', code: '0JWEJS7ISNC', date: 'Jul 12th 2026' },
+                      { title: 'Playstation 5', code: '0JWEJS7ISNC', date: 'Jul 12th 2026' },
+                      { title: 'Hoodie Gombrong', code: '0JWEJS7ISNC', date: 'Jul 12th 2026' },
+                      { title: 'iPhone 15 Pro Max', code: '0JWEJS7ISNC', date: 'Jul 12th 2026' },
+                      { title: 'Lotse', code: '0JWEJS7ISNC', date: 'Jul 12th 2026' },
+                      { title: 'Starbucks', code: '0JWEJS7ISNC', date: 'Jul 12th 2026' },
+                    ];
+                    const itemData = sampleProducts[idx] || {
+                      title: tx.muatan,
+                      code: tx.lead_code,
+                      date: 'Jul 12th 2026',
+                    };
+
+                    return (
+                      <div
+                        key={tx.id}
+                        onClick={() => setSelectedLeadId(tx.id)}
+                        className="py-3 flex items-center justify-between gap-3 hover:bg-gray-50/80 dark:hover:bg-slate-800/50 rounded-xl px-2 transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Siohioma Round Dark Icon Box */}
+                          <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:bg-[#0a1c13] group-hover:text-[#bef264] transition-colors">
+                            {idx === 0 ? <Package className="w-4 h-4" /> :
+                             idx === 1 ? <Zap className="w-4 h-4" /> :
+                             idx === 2 ? <Droplets className="w-4 h-4" /> :
+                             idx === 3 ? <Flame className="w-4 h-4" /> :
+                             <Truck className="w-4 h-4" />}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                              {itemData.title}
+                            </div>
+                            <div className="text-[10px] text-gray-400 dark:text-slate-500 font-medium">
+                              {itemData.date}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status & Code */}
+                        <div className="text-right shrink-0">
+                          <span className={`text-[10px] font-bold block ${
+                            isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                          }`}>
+                            {isCompleted ? 'Completed' : 'Pending'}
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-mono">
+                            {itemData.code}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="space-y-2 text-xs">
-                {routeAnalyticsData.map((item) => (
-                  <div key={item.rute} className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-slate-100 block">{item.rute}</span>
-                      <span className="text-[10px] text-slate-400">{item.leads} Transaksi &middot; {item.tonase} Ton</span>
+              <button
+                onClick={() => setActiveView('leads')}
+                className="w-full py-2.5 rounded-full bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-gray-700 dark:text-slate-300 transition-colors text-center"
+              >
+                View all transactions &rarr;
+              </button>
+            </div>
+
+            {/* ── Middle Column: Revenue Chart + Sales Report (Span 4 cols) ── */}
+            <div className="lg:col-span-4 space-y-5">
+
+              {/* 1. Siohioma Paired Bar Chart: Revenue */}
+              <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 rounded-[24px] shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white">Revenue</h3>
+                  {/* Legend */}
+                  <div className="flex items-center gap-3 text-[10px] font-bold">
+                    <span className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#0a1c13] dark:bg-white inline-block" />
+                      Income
+                    </span>
+                    <span className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#bef264] inline-block" />
+                      Expenses
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                    $193.000
+                  </span>
+                  <span className="text-xs font-bold text-[#84cc16] dark:text-[#bef264] flex items-center gap-0.5">
+                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    +35% from last month
+                  </span>
+                </div>
+
+                {/* Paired Bar Chart */}
+                <div className="h-44 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={revenueBarChartData} barGap={4} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f2f0" />
+                      <XAxis dataKey="month" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0a1c13',
+                          border: 'none',
+                          borderRadius: '12px',
+                          color: '#fff',
+                          fontSize: '11px'
+                        }}
+                      />
+                      <Bar dataKey="income" fill="#0a1c13" radius={[4, 4, 0, 0]} barSize={9} />
+                      <Bar dataKey="expenses" fill="#bef264" radius={[4, 4, 0, 0]} barSize={9} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* 2. Siohioma Horizontal Bars: Sales Report */}
+              <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 rounded-[24px] shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-2">
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white">Sales Report</h3>
+                  <button className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 pt-1">
+                  {/* Bar 1 */}
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      <span>Product Launched (233)</span>
+                      <span className="font-mono text-gray-400">233</span>
                     </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono">
-                        {item.slaPercent}% Tepat Waktu
-                      </span>
+                    <div className="h-2.5 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#bef264] rounded-full" style={{ width: '58%' }} />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Employee Performance KPI Table */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-xs font-bold text-slate-100">Kinerja Tim & Skor KPI Perusahaan</h3>
+                  {/* Bar 2 */}
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      <span>Ongoing Product (23)</span>
+                      <span className="font-mono text-gray-400">23</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#bef264] rounded-full" style={{ width: '22%' }} />
+                    </div>
+                  </div>
+
+                  {/* Bar 3 */}
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      <span>Product Sold (482)</span>
+                      <span className="font-mono text-gray-400">482</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#bef264] rounded-full" style={{ width: '85%' }} />
+                    </div>
+                  </div>
+
+                  {/* Axis line 0, 100, 200, 300, 400 */}
+                  <div className="flex justify-between text-[9px] font-mono text-gray-400 pt-2 border-t border-gray-100 dark:border-slate-800">
+                    <span>0</span>
+                    <span>100</span>
+                    <span>200</span>
+                    <span>300</span>
+                    <span>400</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase border-b border-slate-800">
-                    <tr>
-                      <th className="p-2">PIC Tim</th>
-                      <th className="p-2 text-center">Lead Finish</th>
-                      <th className="p-2 text-center">Tonase</th>
-                      <th className="p-2 text-center">SLA Rate</th>
-                      <th className="p-2 text-right">Skor KPI</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80 text-slate-300">
-                    {creatorPerformance.map((item) => (
-                      <tr key={item.name} className="hover:bg-slate-800/30">
-                        <td className="p-2 font-bold text-slate-100">{item.name}</td>
-                        <td className="p-2 text-center font-mono">{item.leadsCount}</td>
-                        <td className="p-2 text-center font-mono text-teal-300">{item.totalTonase} T</td>
-                        <td className="p-2 text-center font-mono text-emerald-400">{item.onTimeRate}%</td>
-                        <td className="p-2 text-right font-mono font-bold text-amber-300">{item.avgKpi}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
 
-          </div>
+            {/* ── Right Column: Total View Performance + Level Up Card (Span 4 cols) ── */}
+            <div className="lg:col-span-4 space-y-5">
 
-          {/* 8-Stage Pipeline Breakdown Bar */}
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs font-bold text-slate-100">Distribusi Transaksi Dalam 8 Tahap Pipeline</span>
-              <span className="text-[10px] font-mono text-teal-300">{totalLeads} Total Lead</span>
-            </div>
-
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-center text-xs">
-              {statusCounts.map((stg, i) => (
-                <div key={stg.name} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                  <span className="text-[10px] text-slate-400 font-bold block truncate">{i + 1}. {stg.name}</span>
-                  <span className="text-base font-black font-mono text-slate-100">{stg.count}</span>
+              {/* 1. Siohioma Donut Chart Card: Total View Performance */}
+              <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 rounded-[24px] shadow-sm space-y-4">
+                <div className="text-center">
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white">Total View Performance</h3>
                 </div>
-              ))}
+
+                {/* Donut Chart with Center Number */}
+                <div className="h-48 w-full relative flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donutPerformanceData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={78}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {donutPerformanceData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0a1c13',
+                          border: 'none',
+                          borderRadius: '12px',
+                          color: '#fff',
+                          fontSize: '11px'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+
+                  {/* Center Text 565K */}
+                  <div className="absolute text-center">
+                    <span className="text-[10px] text-gray-400 font-bold block">Total Count</span>
+                    <span className="text-2xl font-black text-gray-900 dark:text-white font-mono">565K</span>
+                  </div>
+                </div>
+
+                {/* Percentage Labels */}
+                <div className="flex items-center justify-around text-xs font-bold text-gray-600 dark:text-slate-300">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#f59e0b]" /> 16%
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#0a1c13] dark:bg-white" /> 23%
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#bef264]" /> 68%
+                  </span>
+                </div>
+
+                {/* Tips & Guide Button */}
+                <p className="text-[11px] text-gray-400 text-center">
+                  Here are some tips on how to improve your score.
+                </p>
+
+                <button
+                  onClick={() => openDownloadReportPopup('finished')}
+                  className="w-full py-2.5 rounded-full border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-xs font-bold text-gray-800 dark:text-slate-200 transition-colors"
+                >
+                  Guide Views
+                </button>
+
+                {/* Pill Filter Badges */}
+                <div className="flex justify-center gap-2 pt-1">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-[#bef264]">
+                    View Count
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400">
+                    Percentage
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400">
+                    Sales
+                  </span>
+                </div>
+              </div>
+
+              {/* 2. Siohioma Bottom Right Level-Up Promotional Card */}
+              <div className="bg-[#ecf8d9] dark:bg-[#132617] border border-[#d2edaa] dark:border-[#1d3d24] p-6 rounded-[24px] shadow-sm relative overflow-hidden space-y-4">
+                {/* Decorative Starburst Graphic */}
+                <div className="absolute -right-10 -bottom-10 w-36 h-36 text-[#84cc16]/15 dark:text-[#bef264]/10 pointer-events-none">
+                  <svg className="w-full h-full fill-current" viewBox="0 0 24 24">
+                    <path d="M12 2L13.5 8.5L20 7L15.5 12L20 17L13.5 15.5L12 22L10.5 15.5L4 17L8.5 12L4 7L10.5 8.5L12 2Z" />
+                  </svg>
+                </div>
+
+                <div className="w-8 h-8 rounded-xl bg-[#84cc16]/20 dark:bg-[#bef264]/20 flex items-center justify-center text-[#0a1c13] dark:text-[#bef264]">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+
+                <div>
+                  <h4 className="text-base font-black text-gray-900 dark:text-white leading-tight">
+                    Level up your sales managing to the next level.
+                  </h4>
+                  <p className="text-[11px] text-gray-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    An airy way to manage sales with care and precision.
+                  </p>
+                </div>
+
+                <button
+                  onClick={onOpenNewLead}
+                  className="w-full py-2.5 px-4 rounded-full bg-[#0a1c13] hover:bg-[#142c1f] dark:bg-[#bef264] dark:hover:bg-[#a3e635] text-white dark:text-[#0a1c13] text-xs font-black transition-all shadow-md active:scale-95 text-center"
+                >
+                  Update to IsoTrack+
+                </button>
+              </div>
+
             </div>
+
           </div>
 
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* SUB-MENU 2: TRACKING (ACTION QUEUE & PER-LEAD TRACKING CARDS) */}
+      {/* ── SUBTAB 2: TRACKING (ACTION QUEUE & SHIPMENT STATUS) ── */}
       {/* ========================================================================= */}
       {dashboardSubTab === 'tracking' && (
-        <div className="space-y-4 animate-fadeIn">
-          
-          {/* SECTION 1: PERLU TINDAKAN SAYA (TASK ACTION QUEUE) */}
-          <section className="p-4 md:p-5 rounded-2xl bg-slate-900 border-2 border-teal-500/40 shadow-xl space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="space-y-6">
+
+          {/* Action Queue: PERLU TINDAKAN SAYA */}
+          <section className="p-6 rounded-[24px] bg-white dark:bg-slate-900 border-2 border-[#bef264] shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-slate-800 pb-4">
               <div>
-                <div className="flex items-center space-x-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-teal-500 text-slate-950 font-black text-[10px] uppercase flex items-center space-x-1 shadow-sm">
-                    <AlertTriangle className="w-3 h-3 stroke-[2.5]" />
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-[#0a1c13] text-[#bef264] font-black text-xs uppercase flex items-center gap-1.5 shadow-sm">
+                    <AlertTriangle className="w-3.5 h-3.5" />
                     <span>PERLU TINDAKAN SAYA</span>
                   </span>
-                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs font-mono font-bold">
+                  <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 text-xs font-mono font-bold">
                     {allActionNeededLeads.length} Antrean
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Transaksi aktif yang membutuhkan persetujuan, verifikasi, atau tindak lanjut sesuai peran Anda (<strong className="text-teal-300 capitalize">{currentUser.name} &middot; {currentUser.role}</strong>).
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5">
+                  Transaksi aktif yang membutuhkan persetujuan atau verifikasi untuk peran <strong className="text-emerald-700 dark:text-[#bef264] capitalize">{currentUser.name} ({currentUser.role})</strong>.
                 </p>
               </div>
 
               {/* Category Filter Pills */}
-              <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 p-1 rounded-full text-xs">
                 <button
                   onClick={() => setActionCategory('all')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    actionCategory === 'all' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'
+                  className={`px-3 py-1 rounded-full font-bold transition-all ${
+                    actionCategory === 'all' ? 'bg-[#0a1c13] text-[#bef264]' : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
                   }`}
                 >
                   Semua ({allActionNeededLeads.length})
                 </button>
                 <button
                   onClick={() => setActionCategory('approval')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    actionCategory === 'approval' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-slate-200'
+                  className={`px-3 py-1 rounded-full font-bold transition-all ${
+                    actionCategory === 'approval' ? 'bg-amber-500 text-white' : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
                   }`}
                 >
                   Approval ({approvalCategoryCount})
                 </button>
                 <button
                   onClick={() => setActionCategory('followup')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    actionCategory === 'followup' ? 'bg-orange-400 text-slate-950' : 'text-slate-400 hover:text-slate-200'
+                  className={`px-3 py-1 rounded-full font-bold transition-all ${
+                    actionCategory === 'followup' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
                   }`}
                 >
                   Revisi ({followupCategoryCount})
                 </button>
                 <button
                   onClick={() => setActionCategory('overdue')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    actionCategory === 'overdue' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-slate-200'
+                  className={`px-3 py-1 rounded-full font-bold transition-all ${
+                    actionCategory === 'overdue' ? 'bg-rose-500 text-white' : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
                   }`}
                 >
                   Kritis ({overdueCategoryCount})
@@ -771,17 +757,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
               </div>
             </div>
 
-            {/* Task Action Queue Cards (Compact High Density) */}
+            {/* Task Action Queue Cards */}
             {displayedActionNeededLeads.length === 0 ? (
-              <div className="p-6 rounded-xl bg-slate-950 text-center space-y-2 border border-slate-800">
-                <CheckCheck className="w-8 h-8 text-emerald-400 mx-auto" />
-                <h4 className="text-xs font-bold text-slate-200">Tidak Ada Antrean Tertunda</h4>
-                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                  Seluruh transaksi tugas peran Anda telah diselesaikan dengan lancar.
-                </p>
+              <div className="p-8 rounded-2xl bg-gray-50 dark:bg-slate-800/40 text-center space-y-2">
+                <CheckCheck className="w-8 h-8 text-emerald-500 mx-auto" />
+                <h4 className="text-xs font-bold text-gray-800 dark:text-slate-200">Tidak Ada Antrean Tertunda</h4>
+                <p className="text-[11px] text-gray-400">Seluruh tugas peran Anda telah diselesaikan.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {displayedActionNeededLeads.map((leadItem) => {
                   const isLate = Boolean(leadItem.sla_hours_actual && leadItem.sla_hours_target && leadItem.sla_hours_actual > leadItem.sla_hours_target);
                   const diffHours = (leadItem.sla_hours_target || 48) - (leadItem.sla_hours_actual || 0);
@@ -791,42 +775,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
                   return (
                     <div
                       key={leadItem.id}
-                      className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-teal-500/50 shadow-md transition-all space-y-2 flex flex-col justify-between"
+                      className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 hover:border-emerald-500 shadow-sm transition-all flex flex-col justify-between"
                     >
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-mono font-bold text-[11px]">
-                            {leadItem.lead_code || 'LEAD-00101'}
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-[#bef264] font-mono font-bold text-xs">
+                            {leadItem.lead_code}
                           </span>
                           {isLate ? (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold animate-pulse">
+                            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-bold">
                               Terlambat SLA
                             </span>
                           ) : isUrgent ? (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">
                               Sisa {diffHours}j
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-[10px] font-bold">
                               Tahap {leadItem.current_step}
                             </span>
                           )}
                         </div>
 
-                        <div className="text-xs">
-                          <strong className="text-slate-100 font-bold block truncate">{leadItem.client_company || 'Perusahaan Klien'}</strong>
-                          <span className="text-[11px] text-slate-400 block truncate">{leadItem.no_surat_jalan} &middot; {leadItem.muatan}</span>
+                        <div>
+                          <strong className="text-gray-900 dark:text-white font-bold block truncate">
+                            {leadItem.client_company || 'Perusahaan Klien'}
+                          </strong>
+                          <span className="text-xs text-gray-500 dark:text-slate-400 block truncate">
+                            {leadItem.no_surat_jalan} &middot; {leadItem.muatan}
+                          </span>
                         </div>
 
-                        <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[11px] flex justify-between">
-                          <span className="text-teal-400 font-bold">{currentStage?.name}</span>
-                          <span className="text-slate-400">{leadItem.asal} &rarr; {leadItem.tujuan}</span>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 text-xs flex justify-between border border-gray-100 dark:border-slate-700">
+                          <span className="text-emerald-700 dark:text-[#bef264] font-bold">{currentStage?.name}</span>
+                          <span className="text-gray-500">{leadItem.asal} &rarr; {leadItem.tujuan}</span>
                         </div>
                       </div>
 
                       <button
                         onClick={() => setSelectedLeadId(leadItem.id)}
-                        className="w-full py-1.5 px-3 rounded-lg bg-teal-500/15 hover:bg-teal-500 text-teal-300 hover:text-slate-950 font-bold text-xs border border-teal-500/30 transition-all flex items-center justify-center space-x-1"
+                        className="mt-3 w-full py-2 rounded-xl bg-[#0a1c13] hover:bg-[#142c1f] dark:bg-[#bef264] dark:hover:bg-[#a3e635] text-white dark:text-[#0a1c13] font-bold text-xs transition-all flex items-center justify-center gap-1.5"
                       >
                         <span>Proses Transaksi</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -838,44 +826,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
             )}
           </section>
 
-          {/* SECTION 2: ACTIVE SHIPMENTS & LEAD TRACKING */}
-          <section className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center space-x-2">
-                <Truck className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-xs font-bold text-slate-100">Pelacakan Transaksi Aktif Dalam Siklus</h3>
+          {/* Active Shipments */}
+          <section className="p-6 rounded-[24px] bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-gray-900 dark:text-white">Pelacakan Kontainer Aktif</h3>
               </div>
-              <span className="text-[10px] font-mono text-cyan-300">{activeLeads.length} Lead Aktif</span>
+              <span className="text-xs font-mono text-emerald-700 dark:text-[#bef264] font-bold">
+                {activeLeads.length} Kontainer
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeLeads.map((l) => (
-                <div key={l.id} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                <div key={l.id} className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-800/40 border border-gray-100 dark:border-slate-800 space-y-2 text-xs">
                   <div className="flex justify-between items-center">
-                    <span className="font-mono font-bold text-teal-400 text-[11px]">{l.lead_code}</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-mono">{l.asset_code}</span>
+                    <span className="font-mono font-bold text-emerald-700 dark:text-[#bef264]">{l.lead_code}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-gray-600 dark:text-slate-300 font-mono text-[10px]">
+                      {l.asset_code}
+                    </span>
                   </div>
 
                   <div>
-                    <strong className="text-slate-100 block truncate">{l.client_company || 'PT Petrokimia'}</strong>
-                    <span className="text-[11px] text-slate-400">{l.muatan}</span>
+                    <strong className="text-gray-900 dark:text-white block truncate">{l.client_company || 'PT Niaga Segara'}</strong>
+                    <span className="text-gray-500 dark:text-slate-400">{l.muatan}</span>
                   </div>
 
-                  <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] space-y-1">
-                    <div className="flex justify-between text-slate-300">
-                      <span>Rute:</span>
-                      <strong className="text-slate-200">{l.asal} &rarr; {l.tujuan}</strong>
+                  <div className="p-2 rounded-xl bg-white dark:bg-slate-800 text-[11px] space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Rute:</span>
+                      <strong className="text-gray-800 dark:text-slate-200">{l.asal} &rarr; {l.tujuan}</strong>
                     </div>
-                    {l.current_location_note && (
-                      <div className="text-cyan-300 truncate">
-                        Posisi: {l.current_location_note}
-                      </div>
-                    )}
                   </div>
 
                   <button
                     onClick={() => setSelectedLeadId(l.id)}
-                    className="w-full py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold transition-colors"
+                    className="w-full py-1.5 rounded-xl bg-white hover:bg-gray-100 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-200 text-xs font-bold border border-gray-200 dark:border-slate-600 transition-colors"
                   >
                     Buka Detail Tracking &rarr;
                   </button>
@@ -884,25 +871,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
             </div>
           </section>
 
-          {/* SECTION 3: FINISHED LEADS AUDIT TRACKING TABLE */}
-          <section className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-              <div className="flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-xs font-bold text-slate-100">Audit Pelacakan Lead Selesai (Closed)</h3>
+          {/* Finished Leads Audit Table */}
+          <section className="p-6 rounded-[24px] bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-gray-900 dark:text-white">Audit Transaksi Selesai (Closed)</h3>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={finishedLeadsSearch}
                   onChange={(e) => setFinishedLeadsSearch(e.target.value)}
                   placeholder="Cari SJ / Klien..."
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-100 focus:outline-none w-36"
+                  className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-4 py-1.5 text-xs text-gray-800 dark:text-white focus:outline-none w-44"
                 />
                 <button
                   onClick={exportFinishedLeadsCsv}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                  className="px-4 py-1.5 rounded-full bg-[#0a1c13] dark:bg-[#bef264] text-white dark:text-[#0a1c13] font-bold text-xs"
                 >
                   Ekspor CSV
                 </button>
@@ -911,34 +898,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase border-b border-slate-800">
+                <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-[10px] uppercase">
                   <tr>
-                    <th className="p-2">ID Lead</th>
-                    <th className="p-2">No Surat Jalan</th>
-                    <th className="p-2">Klien Perusahaan</th>
-                    <th className="p-2">Muatan & Isotank</th>
-                    <th className="p-2">Rute Asal-Tujuan</th>
-                    <th className="p-2 text-center">Status SLA</th>
-                    <th className="p-2 text-right">Aksi</th>
+                    <th className="p-3">ID Lead</th>
+                    <th className="p-3">No Surat Jalan</th>
+                    <th className="p-3">Klien</th>
+                    <th className="p-3">Muatan & Unit</th>
+                    <th className="p-3">Rute</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80 text-slate-300">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-gray-700 dark:text-slate-300">
                   {filteredFinishedLeads.map((l) => (
-                    <tr key={l.id} className="hover:bg-slate-800/30">
-                      <td className="p-2 font-mono font-bold text-teal-400">{l.lead_code}</td>
-                      <td className="p-2 font-mono text-[11px] text-slate-300">{l.no_surat_jalan}</td>
-                      <td className="p-2 font-bold text-slate-100">{l.client_company || '-'}</td>
-                      <td className="p-2">{l.muatan} ({l.asset_code})</td>
-                      <td className="p-2 text-slate-400">{l.asal} &rarr; {l.tujuan}</td>
-                      <td className="p-2 text-center">
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                    <tr key={l.id} className="hover:bg-gray-50/60 dark:hover:bg-slate-800/40">
+                      <td className="p-3 font-mono font-bold text-emerald-700 dark:text-[#bef264]">{l.lead_code}</td>
+                      <td className="p-3 font-mono text-gray-500">{l.no_surat_jalan}</td>
+                      <td className="p-3 font-bold text-gray-900 dark:text-white">{l.client_company || '-'}</td>
+                      <td className="p-3">{l.muatan} ({l.asset_code})</td>
+                      <td className="p-3 text-gray-500">{l.asal} &rarr; {l.tujuan}</td>
+                      <td className="p-3 text-center">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-[#bef264] text-[10px] font-bold">
                           ✓ Selesai BASTP
                         </span>
                       </td>
-                      <td className="p-2 text-right">
+                      <td className="p-3 text-right">
                         <button
                           onClick={() => setSelectedLeadId(l.id)}
-                          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold"
+                          className="px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 text-xs font-bold"
                         >
                           Detail
                         </button>
@@ -950,56 +937,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
             </div>
           </section>
 
-        </div>
-      )}
-
-      {/* CUSTOM CALENDAR MODAL */}
-      {showCalendarModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-fadeIn text-xs">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <h3 className="font-bold text-slate-100 text-sm">Rentang Tanggal Kalender</h3>
-              <button onClick={() => setShowCalendarModal(false)} className="text-slate-400 hover:text-white">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Tanggal Mulai:</label>
-                <input
-                  type="date"
-                  value={calendarStart}
-                  onChange={(e) => setCalendarStart(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:border-teal-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Tanggal Akhir:</label>
-                <input
-                  type="date"
-                  value={calendarEnd}
-                  onChange={(e) => setCalendarEnd(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:border-teal-500 focus:outline-none"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setShowCalendarModal(false)}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyCalendar}
-                className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold hover:bg-teal-400 shadow-md"
-              >
-                Terapkan
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
