@@ -91,8 +91,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 apple-header border-b border-slate-800/80 px-4 py-2.5 transition-colors">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 min-h-[44px]">
+    <header className="sticky top-0 z-40 apple-header border-b border-[var(--border-color)] px-4 py-2.5 transition-colors">
+      <div className="w-full flex flex-wrap items-center justify-between gap-3 min-h-[44px]">
         
         {/* Left: Brand Identity & Live Clock */}
         <div className="flex items-center space-x-3">
@@ -367,55 +367,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGoogleLogin }) => {
             <span className="uppercase">{language}</span>
           </button>
 
-          {/* Theme Mode & Accent Toggle */}
+          {/* Dark / Light Mode Switch Toggle Button */}
           <div className="relative">
             <button
-              onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-              className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center justify-center"
-              title="Pengaturan Tema & Warna Aksen"
-              aria-label="Pengaturan tema tampilan dan warna aksen"
+              onClick={() => setThemeMode(themeMode === 'dark' ? 'light' : 'dark')}
+              className="flex items-center space-x-1 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 rounded-full p-1 shadow-sm transition-all cursor-pointer min-h-[40px]"
+              title={themeMode === 'dark' ? 'Beralih ke Light Mode' : 'Beralih ke Dark Mode'}
+              aria-label="Switch dark or light mode"
             >
-              <Palette className="w-4 h-4 text-teal-400" />
-            </button>
-
-            {showThemeDropdown && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-3 z-50">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Mode Tampilan
-                </div>
-                <div className="flex items-center justify-between bg-slate-800/80 rounded-lg p-1 mb-3">
-                  <button
-                    onClick={() => setThemeMode('dark')}
-                    className={`flex-1 py-1 text-xs rounded-md flex items-center justify-center space-x-1 ${themeMode === 'dark' ? 'bg-slate-700 text-teal-400 font-bold' : 'text-slate-400'}`}
-                  >
-                    <Moon className="w-3 h-3" />
-                    <span>Dark</span>
-                  </button>
-                  <button
-                    onClick={() => setThemeMode('light')}
-                    className={`flex-1 py-1 text-xs rounded-md flex items-center justify-center space-x-1 ${themeMode === 'light' ? 'bg-slate-200 text-slate-900 font-bold' : 'text-slate-400'}`}
-                  >
-                    <Sun className="w-3 h-3" />
-                    <span>Light</span>
-                  </button>
-                </div>
-
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Warna Aksen
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['teal', 'sky', 'emerald', 'amber'] as AccentColor[]).map(c => (
-                    <button
-                      key={c}
-                      onClick={() => { setAccentColor(c); setShowThemeDropdown(false); }}
-                      className={`h-7 rounded-lg border flex items-center justify-center text-[10px] uppercase font-bold transition-all ${c === 'teal' ? 'bg-teal-500/20 text-teal-400 border-teal-500' : c === 'sky' ? 'bg-sky-500/20 text-sky-400 border-sky-500' : c === 'emerald' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500' : 'bg-amber-500/20 text-amber-400 border-amber-500'}`}
-                    >
-                      {c[0]}
-                    </button>
-                  ))}
-                </div>
+              <div className={`p-1.5 rounded-full transition-all flex items-center justify-center ${themeMode === 'light' ? 'bg-teal-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
+                <Sun className="w-4 h-4" />
               </div>
-            )}
+              <div className={`p-1.5 rounded-full transition-all flex items-center justify-center ${themeMode === 'dark' ? 'bg-teal-500 text-slate-950 shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'}`}>
+                <Moon className="w-4 h-4" />
+              </div>
+            </button>
           </div>
 
         </div>

@@ -469,60 +469,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewLead }) =
       {dashboardSubTab === 'monitoring' && (
         <div className="space-y-4 animate-fadeIn">
           
-          {/* Top Metric Cards Grid (Compact Dimensions) */}
+          {/* Top Metric Cards Grid (Compact & Futuristic 3D Finly Cards) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1 shadow-md">
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="font-semibold">Total Lead & Volume</span>
-                <TrendingUp className="w-3.5 h-3.5 text-teal-400" />
+            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                <span className="font-semibold tracking-wide">Total Lead & Volume</span>
+                <div className="p-1.5 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="flex items-baseline space-x-1.5">
-                <span className="text-xl font-black text-slate-100 font-mono tabular-nums">{totalLeads}</span>
-                <span className="text-xs text-teal-400 font-bold font-mono">({totalDeliveredTonnes} Ton)</span>
+              <div className="flex items-baseline space-x-2">
+                <span className="text-2xl font-black text-[var(--text-primary)] font-mono tabular-nums">{totalLeads}</span>
+                <span className="text-xs text-[var(--primary)] font-bold font-mono">({totalDeliveredTonnes} Ton)</span>
               </div>
-              <span className="text-[10px] text-slate-400 block truncate">
+              <span className="text-[10px] text-[var(--text-muted)] block truncate">
                 {closedCount} Selesai &middot; {activeLeads.length} Aktif
               </span>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1 shadow-md">
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="font-semibold">Capaian Tepat Waktu SLA</span>
-                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                <span className="font-semibold tracking-wide">Capaian Tepat Waktu SLA</span>
+                <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+                  <Clock className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="flex items-baseline space-x-1.5">
-                <span className="text-xl font-black text-emerald-400 font-mono tabular-nums">{onTimeRate}%</span>
-                <span className="text-xs text-slate-400 font-mono">({avgCycleHours}j avg)</span>
+              <div className="flex items-baseline space-x-2">
+                <span className="text-2xl font-black text-emerald-600 font-mono tabular-nums">{onTimeRate}%</span>
+                <span className="text-xs text-[var(--text-muted)] font-mono">({avgCycleHours}j avg)</span>
               </div>
-              <span className="text-[10px] text-slate-400 block truncate">
+              <span className="text-[10px] text-[var(--text-muted)] block truncate">
                 Kepatuhan standar waktu rute
               </span>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1 shadow-md">
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="font-semibold">Pendapatan Selesai (IDR)</span>
-                <Award className="w-3.5 h-3.5 text-amber-400" />
+            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                <span className="font-semibold tracking-wide">Pendapatan Selesai (IDR)</span>
+                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                  <Award className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="text-lg font-black text-amber-300 font-mono tabular-nums truncate">
+              <div className="text-xl font-black text-amber-600 font-mono tabular-nums truncate">
                 Rp {(totalFinishedRevenue / 1000000).toFixed(0)} Juta
               </div>
-              <span className="text-[10px] text-slate-400 block truncate">
+              <span className="text-[10px] text-[var(--text-muted)] block truncate">
                 Nilai kontrak lead selesai
               </span>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1 shadow-md">
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="font-semibold">Utilisasi Isotank</span>
-                <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+            <div className="card-3d-futuristic futuristic-card-gradient p-4 rounded-2xl border border-[var(--border-color)] space-y-1.5 shadow-lg">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                <span className="font-semibold tracking-wide">Utilisasi Isotank</span>
+                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-500">
+                  <Gauge className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="flex items-baseline space-x-1.5">
-                <span className="text-xl font-black text-cyan-300 font-mono tabular-nums">{assetUtilRate}%</span>
-                <span className="text-xs text-slate-400 font-mono">({operatingAssets}/{totalAssets})</span>
+              <div className="flex items-baseline space-x-2">
+                <span className="text-2xl font-black text-cyan-600 font-mono tabular-nums">{assetUtilRate}%</span>
+                <span className="text-xs text-[var(--text-muted)] font-mono">({operatingAssets}/{totalAssets})</span>
               </div>
-              <span className="text-[10px] text-slate-400 block truncate">
+              <span className="text-[10px] text-[var(--text-muted)] block truncate">
                 {availableAssets} Tersedia Depo
               </span>
             </div>

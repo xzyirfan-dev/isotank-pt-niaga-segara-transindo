@@ -31,6 +31,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
     regenerateClientLink, setClientActionNeeded, showToast
   } = useApp();
 
+  if (!leadId) return null;
+  const lead = leads.find(l => l.id === leadId);
+
   const [activeTab, setActiveTab] = useState<'timeline' | 'operasional' | 'link_klien' | 'jejak_bukti' | 'issues' | 'comments' | 'esignature'>('timeline');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [subStageNotes, setSubStageNotes] = useState<Record<string, string>>({});
@@ -44,6 +47,16 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
 
   // Modals for actions
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
+  const [isVesselModalOpen, setIsVesselModalOpen] = useState(false);
+  const [vesselForm, setVesselForm] = useState({
+    shipping_company: lead?.shipping_company || 'PT Pelayaran Meratus Line',
+    vessel_name: lead?.vessel_name || 'KM Meratus Banjar',
+    voyage_number: lead?.voyage_number || 'VOY-8841',
+    port_origin: lead?.port_origin || 'Pelabuhan Tanjung Perak, Surabaya',
+    port_destination: lead?.port_destination || 'Pelabuhan Trisakti, Banjarmasin',
+    vessel_schedule: lead?.vessel_schedule || 'ETD: Hari +1 19:00 WIB | ETA: Hari +3 08:00 WITA',
+    vessel_ticket_doc_name: lead?.vessel_ticket_doc_name || 'Tiket_Kapal_Resmi_PELNI_Meratus.pdf',
+  });
   const [approvalModalConfig, setApprovalModalConfig] = useState<{
     isOpen: boolean;
     actionType: 'approve_stage_2' | 'reject_stage_2' | 'approve_stage_5' | 'request_revision_stage_5' | 'approve_stage_7' | 'reject_stage_7';
@@ -56,9 +69,6 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
     targetStep: 3,
   });
 
-  if (!leadId) return null;
-
-  const lead = leads.find(l => l.id === leadId);
   if (!lead) return null;
 
   const leadEvidences = evidences.filter(e => e.lead_id === leadId);
@@ -496,39 +506,88 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                           <Ship className="w-4 h-4" />
                         </div>
                         <div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 flex-wrap gap-1.5">
                             <span className="font-bold text-slate-100 text-xs">Pencarian & Pemesanan Kapal Kargo Antar-Pulau</span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                               MULTIMODA SEA FREIGHT
                             </span>
+                            {lead.vessel_ticket_status === 'menyusul' && !lead.vessel_ticket_verified_at ? (
+                              <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center space-x-1 animate-pulse">
+                                <AlertTriangle className="w-3 h-3 text-amber-400 inline mr-1" />
+                                TIKET: MENYUSUL (Belum Divalidasi)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center space-x-1">
+                                <ShieldCheck className="w-3 h-3 text-emerald-400 inline mr-1" />
+                                TIKET SAH & TERVERIFIKASI
+                              </span>
+                            )}
                           </div>
                           <span className="text-[11px] text-cyan-300/80">Pengangkutan Truk & Unit Isotank via Kapal Laut</span>
                         </div>
                       </div>
 
-                      {lead.vessel_ticket_doc_name && (
-                        <button
-                          onClick={() => setActiveViewerEvidence({
-                            id: `ev-ship-${lead.id}`,
-                            lead_id: lead.id,
-                            lead_code: lead.lead_code || 'LEAD-00101',
-                            stage: 'lead_approval',
-                            stage_step: 2,
-                            file_type: 'tiket_kapal',
-                            file_name: lead.vessel_ticket_doc_name,
-                            file_size: '2.1 MB',
-                            uploaded_at: lead.created_at,
-                            uploaded_by: lead.creator_name,
-                            uploaded_by_role: 'karyawan',
-                            notes: `Form Pemesanan / Tiket Kapal Kargo Resmi: Perusahaan ${lead.shipping_company || '-'}, Kapal ${lead.vessel_name || '-'}, No. Voyage / ID Perjalanan: ${lead.voyage_number || '-'}, Rute: ${lead.port_origin || '-'} -> ${lead.port_destination || '-'}, Jadwal: ${lead.vessel_schedule || '-'}.`,
-                          })}
-                          className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-sm"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Lihat & Unduh Tiket Kapal</span>
-                        </button>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {lead.vessel_ticket_status === 'menyusul' && !lead.vessel_ticket_verified_at && !isClosed && (
+                          <button
+                            onClick={() => {
+                              setVesselForm({
+                                shipping_company: lead.shipping_company || 'PT Pelayaran Meratus Line',
+                                vessel_name: lead.vessel_name || 'KM Meratus Banjar',
+                                voyage_number: lead.voyage_number || 'VOY-8841',
+                                port_origin: lead.port_origin || 'Pelabuhan Tanjung Perak, Surabaya',
+                                port_destination: lead.port_destination || 'Pelabuhan Trisakti, Banjarmasin',
+                                vessel_schedule: lead.vessel_schedule || 'ETD: Hari +1 19:00 WIB | ETA: Hari +3 08:00 WITA',
+                                vessel_ticket_doc_name: lead.vessel_ticket_doc_name || 'Tiket_Kapal_Resmi_PELNI_Meratus.pdf',
+                              });
+                              setIsVesselModalOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center space-x-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                          >
+                            <Upload className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>Validasi & Unggah Tiket Kapal</span>
+                          </button>
+                        )}
+
+                        {lead.vessel_ticket_doc_name && (
+                          <button
+                            onClick={() => setActiveViewerEvidence({
+                              id: `ev-ship-${lead.id}`,
+                              lead_id: lead.id,
+                              lead_code: lead.lead_code || 'LEAD-00101',
+                              stage: 'lead_approval',
+                              stage_step: 2,
+                              file_type: 'tiket_kapal',
+                              file_name: lead.vessel_ticket_doc_name,
+                              file_size: '2.1 MB',
+                              uploaded_at: lead.vessel_ticket_verified_at || lead.created_at,
+                              uploaded_by: lead.vessel_ticket_verified_by || lead.creator_name,
+                              uploaded_by_role: 'operasional',
+                              notes: `Form Pemesanan / Tiket Kapal Kargo Resmi: Perusahaan ${lead.shipping_company || '-'}, Kapal ${lead.vessel_name || '-'}, No. Voyage / ID Perjalanan: ${lead.voyage_number || '-'}, Rute: ${lead.port_origin || '-'} -> ${lead.port_destination || '-'}, Jadwal: ${lead.vessel_schedule || '-'}. Status Validasi: Sah.`,
+                            })}
+                            className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-sm"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Lihat & Unduh Tiket Kapal</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Deferred Alert Notice if Menyusul */}
+                    {lead.vessel_ticket_status === 'menyusul' && !lead.vessel_ticket_verified_at && (
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-start space-x-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-bold text-amber-300">
+                            Pemberitahuan Validasi Keamanan Transportasi Laut:
+                          </p>
+                          <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                            Dokumen tiket kapal dipilih <strong>MENYUSUL</strong> saat pembuatan lead. Sesuai Prosedur Kepatuhan ISO 9001:2015, armada truk pengangkut <strong>TIDAK DIPERBOLEHKAN</strong> menuju ke pelabuhan muat sebelum dokumen tiket kapal & manifes diunggah dan divalidasi oleh petugas operasional.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                       <div>
@@ -548,6 +607,18 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                         <span className="text-amber-300 font-medium">{lead.vessel_schedule || '-'}</span>
                       </div>
                     </div>
+
+                    {lead.vessel_ticket_verified_at && (
+                      <div className="pt-2 border-t border-cyan-500/20 flex items-center justify-between text-[11px] text-emerald-300">
+                        <div className="flex items-center space-x-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Divalidasi oleh Petugas Field: <strong>{lead.vessel_ticket_verified_by}</strong></span>
+                        </div>
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {new Date(lead.vessel_ticket_verified_at).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/60 text-xs flex items-center justify-between">
@@ -1598,6 +1669,173 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({ leadId, onClos
                 Kirim Permintaan Revisi (Stage 6)
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vessel Ticket Validation & Upload Modal */}
+      {isVesselModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300">
+                  <Ship className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100">Validasi & Unggah Tiket Kapal Laut</h3>
+                  <span className="text-[11px] text-cyan-400 font-mono">Multimoda Sea Freight Validation</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsVesselModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Lengkapi rincian pemesanan tiket kapal kargo dan unggah dokumen bukti manifes penyeberangan sebelum truk dilepas menuju pelabuhan muat.
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateLeadVesselBooking(lead.id, {
+                  is_inter_island: true,
+                  shipping_company: vesselForm.shipping_company,
+                  vessel_name: vesselForm.vessel_name,
+                  voyage_number: vesselForm.voyage_number,
+                  port_origin: vesselForm.port_origin,
+                  port_destination: vesselForm.port_destination,
+                  vessel_schedule: vesselForm.vessel_schedule,
+                  vessel_ticket_doc_name: vesselForm.vessel_ticket_doc_name,
+                  vessel_ticket_status: 'terlampir',
+                });
+                setIsVesselModalOpen(false);
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Nama Perusahaan Pelayaran / Jasa Kapal:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={vesselForm.shipping_company}
+                  onChange={(e) => setVesselForm({ ...vesselForm, shipping_company: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Nama Kapal Kargo:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={vesselForm.vessel_name}
+                    onChange={(e) => setVesselForm({ ...vesselForm, vessel_name: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    No. Voyage / ID Perjalanan:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={vesselForm.voyage_number}
+                    onChange={(e) => setVesselForm({ ...vesselForm, voyage_number: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Pelabuhan Asal Muat:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={vesselForm.port_origin}
+                    onChange={(e) => setVesselForm({ ...vesselForm, port_origin: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Pelabuhan Tujuan Bongkar:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={vesselForm.port_destination}
+                    onChange={(e) => setVesselForm({ ...vesselForm, port_destination: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Jadwal Keberangkatan & Ketibaan (ETD/ETA):
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={vesselForm.vessel_schedule}
+                  onChange={(e) => setVesselForm({ ...vesselForm, vessel_schedule: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Lampirkan Berkas Tiket / Manifes Kapal (PDF/JPG):
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    required
+                    value={vesselForm.vessel_ticket_doc_name}
+                    onChange={(e) => setVesselForm({ ...vesselForm, vessel_ticket_doc_name: e.target.value })}
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-cyan-500 focus:outline-none font-mono text-[11px]"
+                  />
+                  <span className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold shrink-0">
+                    PDF TERDOKUMENTASI
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Dengan mengklik simpan, tiket kapal divalidasi sah oleh <strong>{currentUser.name}</strong> dan disimpan dalam Jejak Audit ISO 9001.</span>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsVesselModalOpen(false)}
+                  className="px-3.5 py-2 text-xs text-slate-400 hover:text-slate-200"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+                >
+                  Simpan & Validasi Tiket Kapal
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

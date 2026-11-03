@@ -48,6 +48,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
   const [portOrigin, setPortOrigin] = useState<string>('Pelabuhan Tanjung Perak Surabaya');
   const [portDestination, setPortDestination] = useState<string>('Pelabuhan Semayang Balikpapan');
   const [vesselTicketDocName, setVesselTicketDocName] = useState<string>('Tiket_Booking_Kapal_Meratus_VOY088.pdf');
+  const [vesselTicketStatus, setVesselTicketStatus] = useState<'terlampir' | 'menyusul'>('terlampir');
 
   const [assetId, setAssetId] = useState('');
   const [asal, setAsal] = useState('Depo Utama Tuban');
@@ -145,7 +146,8 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
       vessel_schedule: isInterIsland ? vesselSchedule : undefined,
       port_origin: isInterIsland ? portOrigin : undefined,
       port_destination: isInterIsland ? portDestination : undefined,
-      vessel_ticket_doc_name: isInterIsland ? (vesselTicketDocName || 'Tiket_Booking_Kapal.pdf') : undefined,
+      vessel_ticket_doc_name: isInterIsland ? (vesselTicketStatus === 'menyusul' ? 'MENYUSUL (Belum Dilampirkan)' : (vesselTicketDocName || 'Tiket_Booking_Kapal.pdf')) : undefined,
+      vessel_ticket_status: isInterIsland ? vesselTicketStatus : undefined,
       asset_id: assetId,
       asset_code: selectedAsset.code,
       creator_id: currentUser.id,
@@ -270,43 +272,89 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {/* Client Company Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nama Perusahaan Klien / Pemilik Muatan:
-                </label>
-                <input
-                  type="text"
-                  value={clientCompany}
-                  onChange={(e) => setClientCompany(e.target.value)}
-                  placeholder="Contoh: PT Petrokimia Utama Indonesia"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+              {/* Client Company Name - UNIFIED SMART INPUT */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Nama Perusahaan Klien / Pemilik Muatan:
+                  </label>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={clientCompany}
+                    onChange={(e) => setClientCompany(e.target.value)}
+                    placeholder="Contoh: PT Petrokimia Utama Indonesia"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === 'clientCompany' ? null : 'clientCompany')}
+                    className="absolute right-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-teal-300 text-[11px] font-bold flex items-center space-x-1 transition-colors border border-teal-500/30 cursor-pointer"
+                  >
+                    <span>🏢 Preset</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === 'clientCompany' ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Client Downlist Popover */}
+                  {openDropdown === 'clientCompany' && (
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-slate-800 border border-teal-500/40 rounded-xl shadow-2xl overflow-hidden py-1 divide-y divide-slate-700/60 animate-fadeIn">
+                      {[
+                        { label: 'PT Petrokimia Utama Indonesia', desc: 'Industri Pupuk & Petrokimia Nasional' },
+                        { label: 'PT Pupuk Kalimantan Timur (PKT)', desc: 'Produsen Pupuk Kimia & Urea Terbesar' },
+                        { label: 'PT Chandra Asri Pacific Tbk', desc: 'Perusahaan Petrokimia Terintegrasi' },
+                        { label: 'PT Wilmar Nabati Indonesia', desc: 'Industri Pengolahan Oleokimia & Nabati' },
+                        { label: 'PT Lautan Luas Tbk', desc: 'Distributor Bahan Kimia Industri' },
+                        { label: 'PT Asahimas Chemical', desc: 'Chlor-Alkali & Caustic Soda' }
+                      ].map((opt) => (
+                        <button
+                          type="button"
+                          key={opt.label}
+                          onClick={() => {
+                            setClientCompany(opt.label);
+                            setOpenDropdown(null);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 hover:bg-teal-500/15 text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                            clientCompany === opt.label ? 'bg-teal-500/20 text-teal-300 font-bold' : 'text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-teal-300">{opt.label}</span>
+                            {clientCompany === opt.label && <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />}
+                          </div>
+                          <span className="text-[10px] text-slate-400 truncate">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* No Surat Jalan */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
                   <label className="text-xs font-bold text-slate-300">
                     No. Surat Jalan <span className="text-teal-400 font-semibold">(Unik)</span>:
                   </label>
                   <button
                     type="button"
                     onClick={() => setNoSuratJalan(generateAutoSJ())}
-                    className="text-[10px] font-bold text-teal-400 hover:text-teal-300 flex items-center space-x-1 px-1.5 py-0.5 rounded hover:bg-teal-500/10 transition-colors"
+                    className="text-[10px] font-bold text-teal-400 hover:text-teal-300 flex items-center space-x-1 px-2 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
                     <span>Acak No. SJ</span>
                   </button>
                 </div>
-                <input
-                  type="text"
-                  value={noSuratJalan}
-                  onChange={(e) => setNoSuratJalan(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={noSuratJalan}
+                    onChange={(e) => setNoSuratJalan(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -329,16 +377,18 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
               
               {/* Transport Vendor Company - UNIFIED SMART INPUT */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300">
-                  Nama Perusahaan Penyedia Truk / Vendor:
-                </label>
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Nama Perusahaan Penyedia Truk / Vendor:
+                  </label>
+                </div>
                 <div className="relative flex items-center">
                   <input
                     type="text"
                     value={transportVendorName}
                     onChange={(e) => setTransportVendorName(e.target.value)}
                     placeholder="Contoh: PT Segara Logistik Express"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                     required
                   />
                   <button
@@ -383,38 +433,46 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
               </div>
 
               {/* Driver Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nama Supir / Pengemudi Truk:
-                </label>
-                <input
-                  type="text"
-                  value={namaSupir}
-                  onChange={(e) => setNamaSupir(e.target.value)}
-                  placeholder="Contoh: Bambang Susanto (SIM B2 Umum)"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Nama Supir / Pengemudi Truk:
+                  </label>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={namaSupir}
+                    onChange={(e) => setNamaSupir(e.target.value)}
+                    placeholder="Contoh: Bambang Susanto (SIM B2 Umum)"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Truck License Plate */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nomor Plat Truk Pengangkut:
-                </label>
-                <input
-                  type="text"
-                  value={noPlatTruk}
-                  onChange={(e) => setNoPlatTruk(e.target.value)}
-                  placeholder="Contoh: B 9842 UFX"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Nomor Plat Truk Pengangkut:
+                  </label>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={noPlatTruk}
+                    onChange={(e) => setNoPlatTruk(e.target.value)}
+                    placeholder="Contoh: B 9842 UFX"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs font-mono font-bold text-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Legal Document Attachment - UNIFIED DUAL ACTION INPUT */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between h-6 mb-1.5">
                   <label className="text-xs font-bold text-slate-300">
                     Dokumen Lampiran Absah (STNK / SIM / Penunjukan):
                   </label>
@@ -431,7 +489,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                     value={transportDocName}
                     onChange={(e) => setTransportDocName(e.target.value)}
                     placeholder="Nama Berkas Dokumen (pdf/jpg)"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-44 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none font-mono transition-all"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-44 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none font-mono transition-all"
                     required
                   />
 
@@ -649,17 +707,61 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
                   />
                 </div>
 
+                {/* Vessel Ticket Status Choice: Terlampir vs Menyusul */}
+                <div className="md:col-span-2 space-y-2 pt-1">
+                  <label className="block text-xs font-bold text-cyan-300">
+                    Pilihan Status Waktu Dokumen Tiket & Booking Kapal (Validasi Keamanan & Proses Lapangan):
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setVesselTicketStatus('terlampir')}
+                      className={`p-2.5 rounded-xl text-left border text-xs transition-all flex items-center justify-between ${
+                        vesselTicketStatus === 'terlampir'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 font-bold'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-bold">Lampirkan Sekarang</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Tiket & booking kapal sudah siap diunggah</div>
+                      </div>
+                      {vesselTicketStatus === 'terlampir' && <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setVesselTicketStatus('menyusul')}
+                      className={`p-2.5 rounded-xl text-left border text-xs transition-all flex items-center justify-between ${
+                        vesselTicketStatus === 'menyusul'
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-200 font-bold'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-bold">Tiket Menyusul</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Karyawan masih mengurus armada/truk/kapal bertahap (wajib sebelum truk ke pelabuhan)</div>
+                      </div>
+                      {vesselTicketStatus === 'menyusul' && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 ml-2" />}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Vessel Booking Document / Ticket - UNIFIED DUAL ACTION INPUT */}
                 <div className="md:col-span-2 space-y-1">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-300">
                       Lampiran Form Pemesanan / Tiket Jasa Kapal (PDF/JPG):
                     </label>
-                    {vesselTicketDocName && (
+                    {vesselTicketStatus === 'menyusul' ? (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/40 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-400" /> STATUS: MENYUSUL
+                      </span>
+                    ) : vesselTicketDocName ? (
                       <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/40 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-cyan-400" /> TERLAMPIR
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="relative flex items-center">
@@ -752,14 +854,16 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               
               {/* Asset Isotank Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Pilih Unit Isotank <span className="text-teal-400">*Wajib Ready</span>:
-                </label>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Pilih Unit Isotank <span className="text-teal-400">*Wajib Ready</span>:
+                  </label>
+                </div>
                 <select
                   value={assetId}
                   onChange={(e) => setAssetId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all cursor-pointer"
                   required
                 >
                   <option value="">-- Pilih Unit Isotank --</option>
@@ -780,16 +884,18 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
 
               {/* Chemical Cargo - UNIFIED SMART INPUT */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300">
-                  Spesifikasi Muatan Chemical / Liquid:
-                </label>
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Spesifikasi Muatan Chemical / Liquid:
+                  </label>
+                </div>
                 <div className="relative flex items-center">
                   <input
                     type="text"
                     value={muatan}
                     onChange={(e) => setMuatan(e.target.value)}
                     placeholder="Contoh: Caustic Soda Liquid 48%"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3.5 pr-28 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
                     required
                   />
                   <button
@@ -835,55 +941,71 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({ isOpen, onClose }) =
               </div>
 
               {/* Asal */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Lokasi Asal (Depo/Pelabuhan):</label>
-                <input
-                  type="text"
-                  value={asal}
-                  onChange={(e) => setAsal(e.target.value)}
-                  placeholder="Contoh: Depo Utama Tuban"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">Lokasi Asal (Depo/Pelabuhan):</label>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={asal}
+                    onChange={(e) => setAsal(e.target.value)}
+                    placeholder="Contoh: Depo Utama Tuban"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Tujuan */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Lokasi Tujuan Pembongkaran:</label>
-                <input
-                  type="text"
-                  value={tujuan}
-                  onChange={(e) => setTujuan(e.target.value)}
-                  placeholder="Contoh: Kawasan Industri Petrokimia Gresik"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">Lokasi Tujuan Pembongkaran:</label>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={tujuan}
+                    onChange={(e) => setTujuan(e.target.value)}
+                    placeholder="Contoh: Kawasan Industri Petrokimia Gresik"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Target SLA Datetime */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Target Waktu Ketibaan (SLA):</label>
-                <input
-                  type="datetime-local"
-                  value={targetAt}
-                  onChange={(e) => setTargetAt(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                  required
-                />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">Target Waktu Ketibaan (SLA):</label>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="datetime-local"
+                    value={targetAt}
+                    onChange={(e) => setTargetAt(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Manager Assignment */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Manager Penanggung Jawab Approval:</label>
-                <select
-                  value={managerId}
-                  onChange={(e) => setManagerId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all"
-                >
-                  {managers.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.department})</option>
-                  ))}
-                </select>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between h-6 mb-1.5">
+                  <label className="text-xs font-bold text-slate-300">Manager Penanggung Jawab Approval:</label>
+                </div>
+                <div className="relative flex items-center">
+                  <select
+                    value={managerId}
+                    onChange={(e) => setManagerId(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 h-10 text-xs text-slate-100 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-all cursor-pointer"
+                  >
+                    {managers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.department})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
             </div>

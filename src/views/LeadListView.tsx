@@ -386,37 +386,40 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
       {/* VIEW MODE 1: TABEL TRANSAKSIONAL (10 BARIS MAKSIMAL PER TAMPILAN & FITUR SCROLL UP-DOWN) */}
       {leadViewMode === 'table' && (
         <div className="space-y-2.5">
-          {/* Scroll Up & Down Helper Bar with 10 Leads Indicator (TOP) */}
+          {/* Table Header Indicator Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 shadow-sm">
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse shrink-0" />
               <span className="text-[11px] sm:text-xs">
-                Menampilkan <strong className="text-teal-300 font-mono">{displayedLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + LEADS_PER_VIEW, displayedLeads.length)}</strong> dari <strong className="text-white font-mono">{displayedLeads.length} Leads</strong> (Maksimal 10 Baris per View · Halaman {currentPage} dari {totalPages})
+                Menampilkan <strong className="text-teal-300 font-mono">{displayedLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + LEADS_PER_VIEW, displayedLeads.length)}</strong> dari <strong className="text-white font-mono">{displayedLeads.length} Leads</strong> (Halaman {currentPage} dari {totalPages})
               </span>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={handleScrollUp}
-                disabled={currentPage <= 1}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-teal-300 font-bold text-xs flex items-center space-x-1.5 border border-slate-700 transition-all shadow-sm active:scale-95"
-                title="Scroll Naik / Halaman 10 Baris Sebelumnya"
-              >
-                <ArrowUpDown className="w-3.5 h-3.5 text-teal-400" />
-                <span>▲ Scroll Naik</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleScrollDown}
-                disabled={currentPage >= totalPages}
-                className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 disabled:cursor-not-allowed text-slate-950 font-black text-xs flex items-center space-x-1.5 shadow-md shadow-teal-500/20 transition-all active:scale-95"
-                title="Scroll Turun / Halaman 10 Baris Selanjutnya"
-              >
-                <span>▼ Scroll Turun</span>
-                <ArrowUpDown className="w-3.5 h-3.5 rotate-180 text-slate-950" />
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  onClick={handleScrollUp}
+                  disabled={currentPage <= 1}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 font-bold text-xs border border-slate-700 transition-all"
+                  title="Halaman Sebelumnya"
+                >
+                  &larr; Prev
+                </button>
+                <span className="px-2 py-0.5 text-xs font-mono font-bold text-teal-300">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleScrollDown}
+                  disabled={currentPage >= totalPages}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 font-bold text-xs border border-slate-700 transition-all"
+                  title="Halaman Selanjutnya"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Table Container: strictly vertical scroll (overflow-y-auto), ZERO horizontal scrolling (overflow-x-hidden), max 10 leads height */}
@@ -570,38 +573,38 @@ export const LeadListView: React.FC<LeadListViewProps> = ({ onOpenNewLead }) => 
             </table>
           </div>
 
-          {/* Scroll Up & Down Helper Bar with 10 Leads Indicator (BOTTOM) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 shadow-sm">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse shrink-0" />
-              <span className="text-[11px] sm:text-xs">
-                Menampilkan <strong className="text-teal-300 font-mono">{displayedLeads.length > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + LEADS_PER_VIEW, displayedLeads.length)}</strong> dari <strong className="text-white font-mono">{displayedLeads.length} Leads</strong> (Halaman {currentPage} dari {totalPages})
+          {/* Clean Pagination Footer if multiple pages */}
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 shadow-sm">
+              <span className="text-[11px] text-slate-400">
+                Halaman <strong className="text-teal-300 font-mono">{currentPage}</strong> dari <strong className="text-white font-mono">{totalPages}</strong>
               </span>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={handleScrollUp}
-                disabled={currentPage <= 1}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-teal-300 font-bold text-xs flex items-center space-x-1.5 border border-slate-700 transition-all shadow-sm active:scale-95"
-                title="Scroll Naik / Halaman 10 Baris Sebelumnya"
-              >
-                <ArrowUpDown className="w-3.5 h-3.5 text-teal-400" />
-                <span>▲ Scroll Naik</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleScrollDown}
-                disabled={currentPage >= totalPages}
-                className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 disabled:cursor-not-allowed text-slate-950 font-black text-xs flex items-center space-x-1.5 shadow-md shadow-teal-500/20 transition-all active:scale-95"
-                title="Scroll Turun / Halaman 10 Baris Selanjutnya"
-              >
-                <span>▼ Scroll Turun</span>
-                <ArrowUpDown className="w-3.5 h-3.5 rotate-180 text-slate-950" />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  onClick={handleScrollUp}
+                  disabled={currentPage <= 1}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 font-bold text-xs border border-slate-700 transition-all"
+                  title="Halaman Sebelumnya"
+                >
+                  &larr; Prev
+                </button>
+                <span className="px-2 py-0.5 text-xs font-mono font-bold text-teal-300">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleScrollDown}
+                  disabled={currentPage >= totalPages}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 font-bold text-xs border border-slate-700 transition-all"
+                  title="Halaman Selanjutnya"
+                >
+                  Next &rarr;
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

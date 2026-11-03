@@ -97,6 +97,7 @@ interface AppContextType {
     leadId: string,
     vesselData: {
       is_inter_island: boolean;
+      vessel_ticket_status?: 'terlampir' | 'menyusul';
       shipping_company?: string;
       vessel_name?: string;
       voyage_number?: string;
@@ -105,6 +106,8 @@ interface AppContextType {
       port_destination?: string;
       vessel_ticket_doc_name?: string;
       vessel_ticket_doc_url?: string;
+      vessel_ticket_verified_at?: string;
+      vessel_ticket_verified_by?: string;
     }
   ) => void;
   updateLeadTransportDoc: (leadId: string, transportDocName: string) => void;
@@ -614,10 +617,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Update Inter-Island Vessel Booking Info
+  // Update Inter-Island Vessel Booking Info & Validate Ticket
   const updateLeadVesselBooking = (
     leadId: string,
     vesselData: {
       is_inter_island: boolean;
+      vessel_ticket_status?: 'terlampir' | 'menyusul';
       shipping_company?: string;
       vessel_name?: string;
       voyage_number?: string;
@@ -626,21 +631,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       port_destination?: string;
       vessel_ticket_doc_name?: string;
       vessel_ticket_doc_url?: string;
+      vessel_ticket_verified_at?: string;
+      vessel_ticket_verified_by?: string;
     }
   ) => {
+    const nowIso = new Date().toISOString();
+    const verifiedStatus = vesselData.vessel_ticket_doc_name ? 'terlampir' : (vesselData.vessel_ticket_status || 'terlampir');
+
     setLeads(prev => prev.map(l => l.id === leadId ? {
       ...l,
       ...vesselData,
-      updated_at: new Date().toISOString()
+      vessel_ticket_status: verifiedStatus,
+      vessel_ticket_verified_at: vesselData.vessel_ticket_verified_at || (vesselData.vessel_ticket_doc_name ? nowIso : l.vessel_ticket_verified_at),
+      vessel_ticket_verified_by: vesselData.vessel_ticket_verified_by || (vesselData.vessel_ticket_doc_name ? currentUser.name : l.vessel_ticket_verified_by),
+      updated_at: nowIso
     } : l));
+
+    // If ticket document is provided, ensure evidence is recorded
+    if (vesselData.vessel_ticket_doc_name) {
+      setEvidences(prev => {
+        const exists = prev.some(e => e.lead_id === leadId && e.file_name === vesselData.vessel_ticket_doc_name);
+        if (exists) return prev;
+        const targetLead = leads.find(l => l.id === leadId);
+        return [
+          {
+            id: `ev-${Date.now()}-ship`,
+            lead_id: leadId,
+            lead_code: targetLead?.lead_code || 'LEAD-00101',
+            stage: targetLead?.status || 'in_progress',
+            stage_step: targetLead?.current_step || 3,
+            file_type: 'tiket_kapal',
+            file_name: vesselData.vessel_ticket_doc_name || 'Tiket_Kapal_Resmi.pdf',
+            file_size: '2.4 MB',
+            uploaded_by: currentUser.name,
+            uploaded_by_role: currentUser.role,
+            uploaded_at: nowIso,
+            notes: `Form Pemesanan & Tiket Kapal Kargo Resmi Divalidasi: ${vesselData.shipping_company || '-'} - ${vesselData.vessel_name || '-'} (No. Voyage: ${vesselData.voyage_number || '-'}). Rute: ${vesselData.port_origin || '-'} -> ${vesselData.port_destination || '-'}.`
+          },
+          ...prev
+        ];
+      });
+    }
 
     const target = leads.find(l => l.id === leadId);
     appendAuditLog(
       'UPDATE_VESSEL_BOOKING',
       'Lead',
       leadId,
-      `[ID Lead: ${target?.lead_code || leadId}] Memperbarui data pemesanan kapal kargo: ${vesselData.shipping_company || 'Kapal Kargo'} (${vesselData.vessel_name || '-'}, Voyage: ${vesselData.voyage_number || '-'}).`
+      `[ID Lead: ${target?.lead_code || leadId}] Validasi Dokumen Kapal: ${vesselData.shipping_company || 'Kapal Kargo'} (${vesselData.vessel_name || '-'}, Voyage: ${vesselData.voyage_number || '-'}, Tiket: ${vesselData.vessel_ticket_doc_name || 'Menyusul'}).`
     );
+
+    showToast({
+      type: 'status',
+      title: 'Tiket & Armada Kapal Divalidasi',
+      message: `Data kapal ${vesselData.vessel_name || ''} & berkas tiket berhasil divalidasi sah sebelum truk ke pelabuhan.`
+    });
   };
 
   // Update Final Delivery Proof (Syarat Penutupan Lead)
@@ -713,13 +758,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           message: 'Instrumen Validasi: Dokumen absah kemitraan transportasi (Surat Perjanjian/STNK/SIM B2) belum diunggah! Tidak dapat melanjutkan approval.'
         };
       }
+      // If inter-island and NOT marked as 'menyusul', require vessel ticket immediately
+      if (lead.is_inter_island && lead.vessel_ticket_status !== 'menyusul') {
+        const hasVesselTicket = Boolean(lead.vessel_ticket_doc_name) ||
+          evidences.some(e => e.lead_id === leadId && e.file_type === 'tiket_kapal');
+        if (!hasVesselTicket) {
+          return {
+            success: false,
+            message: 'Instrumen Validasi: Pengiriman rute antar-pulau terdeteksi! Berkas form pemesanan / tiket kapal kargo laut wajib dilampirkan atau diset status "Menyusul" sebelum disetujui!'
+          };
+        }
+      }
+    }
+
+    // MANDATORY VESSEL TICKET VALIDATION BEFORE SEA TRANSPORT / SUBMISSION
+    if (targetStage === 'submission' || targetStage === 'review' || targetStage === 'final_approval' || targetStage === 'closed') {
       if (lead.is_inter_island) {
         const hasVesselTicket = Boolean(lead.vessel_ticket_doc_name) ||
           evidences.some(e => e.lead_id === leadId && e.file_type === 'tiket_kapal');
         if (!hasVesselTicket) {
           return {
             success: false,
-            message: 'Instrumen Validasi: Pengiriman rute antar-pulau terdeteksi! Berkas form pemesanan / tiket kapal kargo laut wajib dilampirkan sebelum disetujui!'
+            message: 'Validasi Keamanan & Legalitas Pengiriman: Rute antar-pulau mewajibkan validasi dokumen & tiket kapal kargo laut sebelum truk menuju ke pelabuhan muat!'
           };
         }
       }
@@ -860,6 +920,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return {
           success: false,
           message: `Aturan Konsistensi Lapangan: Sub-tahap "${currentSubStages[targetIdx].title}" tidak dapat diselesaikan sebelum sub-tahap sebelumnya ("${prevSubStage.title}") selesai!`
+        };
+      }
+    }
+
+    // Validation Checkpoint: Before truck heads to port / gate-in, inter-island shipment must have vessel ticket validated
+    if (lead.is_inter_island && (targetIdx === 1 && newStatus === 'selesai' || (targetIdx >= 2 && newStatus === 'berjalan'))) {
+      const hasVesselDoc = Boolean(lead.vessel_ticket_doc_name) ||
+        evidences.some(e => e.lead_id === leadId && e.file_type === 'tiket_kapal');
+      if (!hasVesselDoc && currentUser.role !== 'admin') {
+        return {
+          success: false,
+          message: 'Validasi Keselamatan & Dokumen Kapal: Sebelum truk bergerak / masuk ke pelabuhan, tiket dan manifest kapal kargo wajib divalidasi terlebih dahulu melalui formulir tiket kapal!'
         };
       }
     }

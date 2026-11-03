@@ -96,8 +96,8 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'w-full md:w-20 p-2.5' : 'w-full md:w-64 p-4'
+      className={`h-full bg-[#064e3b] text-white border-r border-slate-700 flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'w-20 p-2.5' : 'w-64 p-4'
       }`}
     >
       <div className="space-y-4">
@@ -195,16 +195,14 @@ export const Sidebar: React.FC = () => {
                   title={item.label}
                   className={`w-full h-11 flex items-center justify-center rounded-xl transition-all relative group ${
                     isActive
-                      ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20 font-bold'
-                      : item.highlight
-                      ? 'text-teal-300 hover:bg-slate-800 border border-teal-500/20'
-                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                      ? 'bg-white/20 text-white font-bold'
+                      : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-slate-950' : item.highlight ? 'text-teal-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-blue-200'}`} />
 
                   {item.badge !== undefined && item.badge > 0 && (
-                    <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 text-[9px] rounded-full font-black bg-rose-500 text-white flex items-center justify-center shadow-md animate-pulse">
+                    <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 text-[9px] rounded-full font-black bg-rose-500 text-white flex items-center justify-center shadow-md">
                       {item.badge}
                     </span>
                   )}
@@ -219,10 +217,8 @@ export const Sidebar: React.FC = () => {
                 onClick={() => setActiveView(item.id)}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
                   isActive
-                    ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20 font-bold'
-                    : item.highlight
-                    ? 'text-teal-300 hover:bg-slate-800 border border-teal-500/20'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                    ? 'bg-white/20 text-white font-bold'
+                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
                 }`}
               >
                 <div className="flex items-center space-x-2.5">

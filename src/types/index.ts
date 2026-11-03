@@ -85,6 +85,9 @@ export interface Lead {
   port_destination?: string; // Pelabuhan Tujuan Bongkar
   vessel_ticket_doc_name?: string; // Lampiran Bukti Form Pemesanan / Tiket Kapal Kargo
   vessel_ticket_doc_url?: string;
+  vessel_ticket_status?: 'terlampir' | 'menyusul'; // Status: Terlampir saat inisiasi atau Menyusul sebelum truk ke pelabuhan
+  vessel_ticket_verified_at?: string; // Tanggal verifikasi tiket kapal
+  vessel_ticket_verified_by?: string; // Petugas verifikator tiket kapal
   // Final Delivery Proof (Syarat Penutupan / Selesai Lead)
   final_delivery_doc_name?: string; // Dokumen Berita Acara Serah Terima / Foto Ketibaan Tujuan
   final_delivery_doc_url?: string;

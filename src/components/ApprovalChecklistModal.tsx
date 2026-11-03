@@ -84,9 +84,16 @@ export const ApprovalChecklistModal: React.FC<ApprovalChecklistModalProps> = ({
         const hasVesselDoc = Boolean(lead.vessel_ticket_doc_name) ||
           Boolean(quickVesselTicket.trim()) ||
           leadEvidences.some(e => e.file_type === 'tiket_kapal');
-        isVesselValid = hasVesselDoc && Boolean(lead.shipping_company);
-        vesselDocText = `Tiket Kapal: ${lead.vessel_ticket_doc_name || quickVesselTicket || 'Tiket_Kapal.pdf'} (${lead.shipping_company || '-'} - ${lead.vessel_name || '-'})`;
-        vesselMissing = 'Pengiriman antar-pulau terdeteksi, namun berkas form pemesanan / tiket booking kapal kargo & jadwal belum terlampir.';
+        if (hasVesselDoc) {
+          isVesselValid = true;
+          vesselDocText = `Tiket Kapal Terlampir: ${lead.vessel_ticket_doc_name || quickVesselTicket} (${lead.shipping_company || '-'} - ${lead.vessel_name || '-'})`;
+        } else if (lead.vessel_ticket_status === 'menyusul') {
+          isVesselValid = true;
+          vesselDocText = 'Status Tiket: MENYUSUL (Diizinkan: Wajib divalidasi petugas lapangan sebelum truk menuju ke pelabuhan)';
+        } else {
+          isVesselValid = false;
+          vesselMissing = 'Pengiriman antar-pulau terdeteksi, namun berkas tiket kapal kargo belum terlampir.';
+        }
       }
 
       // 4. Surat Jalan & Muatan

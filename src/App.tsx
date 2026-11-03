@@ -8,6 +8,7 @@ import { NewLeadModal } from './components/NewLeadModal';
 import { LeadDetailModal } from './components/LeadDetailModal';
 import { AppleToastNotification } from './components/AppleToastNotification';
 import { CommandPalette } from './components/CommandPalette';
+import { CursorFollowerLight } from './components/CursorFollowerLight';
 
 import { DashboardView } from './views/DashboardView';
 import { MyTasksView } from './views/MyTasksView';
@@ -68,49 +69,51 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-white">
-      {/* Top Header */}
-      <Header onOpenGoogleLogin={() => setIsGoogleModalOpen(true)} />
-
-      {/* Body Content Area */}
-      <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
-        {/* Sidebar Navigation */}
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-[var(--primary)] selection:text-white transition-colors duration-300 px-0 md:px-4">
+      <div className="w-full max-w-[1600px] mx-auto bg-[var(--bg-surface)] shadow-2xl flex flex-row overflow-hidden min-h-screen md:h-[calc(100vh-2rem)] md:my-4 md:rounded-2xl md:border border-[var(--border-color)]">
+        {/* Sidebar Navigation - Full height */}
         <Sidebar />
 
-        {/* Main Content Workspace */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
-          {/* Global Period Filter bar */}
-          <GlobalPeriodFilter />
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+          {/* Header */}
+          <Header onOpenGoogleLogin={() => setIsGoogleModalOpen(true)} />
 
-          {/* Active View Router */}
-          {(activeView === 'dashboard' || activeView === 'new_lead') && (
-            <DashboardView onOpenNewLead={handleOpenNewLeadModal} />
-          )}
+          {/* Main Content */}
+          <main className="flex-1 p-4 md:p-6">
+            {/* Global Period Filter bar */}
+            <GlobalPeriodFilter />
 
-          {activeView === 'my_tasks' && (
-            <MyTasksView />
-          )}
+            {/* Active View Router */}
+            {(activeView === 'dashboard' || activeView === 'new_lead') && (
+              <DashboardView onOpenNewLead={handleOpenNewLeadModal} />
+            )}
 
-          {activeView === 'leads' && (
-            <LeadListView onOpenNewLead={handleOpenNewLeadModal} />
-          )}
+            {activeView === 'my_tasks' && (
+              <MyTasksView />
+            )}
 
-          {activeView === 'reports' && (
-            <ReportsView />
-          )}
+            {activeView === 'leads' && (
+              <LeadListView onOpenNewLead={handleOpenNewLeadModal} />
+            )}
 
-          {activeView === 'ai_recommendations' && (
-            <AiRecommendationsView />
-          )}
+            {activeView === 'reports' && (
+              <ReportsView />
+            )}
 
-          {activeView === 'system_log' && (
-            <SystemLogView />
-          )}
+            {activeView === 'ai_recommendations' && (
+              <AiRecommendationsView />
+            )}
 
-          {(activeView === 'admin' || activeView === 'employee_control') && (
-            <AdminView initialTab={activeView === 'employee_control' ? 'karyawan' : 'karyawan'} />
-          )}
-        </main>
+            {activeView === 'system_log' && (
+              <SystemLogView />
+            )}
+
+            {(activeView === 'admin' || activeView === 'employee_control') && (
+              <AdminView initialTab={activeView === 'employee_control' ? 'karyawan' : 'karyawan'} />
+            )}
+          </main>
+        </div>
       </div>
 
       {/* Global Modals */}
@@ -134,6 +137,9 @@ const MainLayout: React.FC = () => {
 
       {/* Global Command Palette (Cmd/Ctrl + K) */}
       <CommandPalette />
+
+      {/* Global Futuristic Cursor Follower Light Effect */}
+      <CursorFollowerLight />
     </div>
   );
 };

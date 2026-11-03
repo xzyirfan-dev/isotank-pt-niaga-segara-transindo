@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   /* Apple Typography Stack */
@@ -33,33 +34,33 @@
   --duration-normal: 300ms;
   --duration-smooth: 400ms;
 
-  /* Light Theme Color Tokens */
-  --bg-app: #f8fafc;
+  /* Light Theme Color Tokens (Siohioma Inspired) */
+  --bg-app: #f3f4f6;
   --bg-surface: #ffffff;
-  --bg-surface-subtle: #f1f5f9;
-  --border-color: #cbd5e1;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --primary: #0d9488;
-  --primary-hover: #0f766e;
+  --bg-surface-subtle: #f9fafb;
+  --border-color: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --primary: #166534;
+  --primary-hover: #14532d;
 }
 
 .dark {
-  /* Dark Theme Color Tokens */
-  --bg-app: #030712;
-  --bg-surface: #0f172a;
-  --bg-surface-subtle: #1e293b;
-  --border-color: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --primary: #14b8a6;
-  --primary-hover: #0d9488;
+  /* Dark Theme Color Tokens (Siohioma Inspired) */
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-subtle: #334155;
+  --border-color: #475569;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --primary: #22c55e;
+  --primary-hover: #16a34a;
 
-  --shadow-apple-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
-  --shadow-apple-md: 0 4px 14px -1px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.25);
-  --shadow-apple-lg: 0 12px 30px -4px rgba(0, 0, 0, 0.6), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  --shadow-apple-sm: 0 2px 8px 0 rgba(0, 0, 0, 0.4);
+  --shadow-apple-md: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 4px 10px -2px rgba(0, 0, 0, 0.3);
+  --shadow-apple-lg: 0 20px 40px -8px rgba(0, 0, 0, 0.7), 0 8px 20px -4px rgba(0, 0, 0, 0.5);
 }
 
 @layer base {
@@ -144,7 +145,81 @@ button:active:not(:disabled), .btn-interactive:active {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-apple-md);
-  border-radius: var(--radius-xl);
+  border-radius: 20px;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s ease;
+}
+
+/* Futuristic 3D Card Glass & Glow Effects */
+.card-3d-futuristic {
+  position: relative;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.futuristic-card-gradient {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%);
+  background-color: var(--bg-surface);
+}
+
+.card-3d-futuristic:hover {
+  transform: translateY(-4px) rotateX(2deg) rotateY(-1.5deg) scale(1.01);
+  box-shadow: 0 20px 35px -10px rgba(56, 189, 248, 0.2), 0 0 20px 2px rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* Holographic Shimmer Edge */
+.card-3d-futuristic::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(20, 184, 166, 0.3), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.card-3d-futuristic:hover::before {
+  opacity: 1;
+}
+
+/* Segmented Finly Pill Tabs */
+.finly-pill-container {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-radius: 9999px;
+  padding: 4px;
+}
+
+.dark .finly-pill-container {
+  background: #101622;
+  border-color: #242c3d;
+}
+
+.light .finly-pill-container {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+/* Glow Badge Pill */
+.glow-badge-purple {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+}
+
+.glow-badge-teal {
+  background: rgba(20, 184, 166, 0.15);
+  color: #5eead4;
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.25);
 }
 
 /* Table Row Minimum Height 44px & Clean Alignment */
